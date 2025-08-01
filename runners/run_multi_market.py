@@ -17,6 +17,7 @@ from data.account_streamer import start_account_streaming, stop_account_streamin
 from data.trade_streamer import start_trade_streaming, stop_trade_streaming, get_live_active_trades
 from utils.market_config_loader import MarketConfigLoader
 from utils.trading_safety import get_trading_safety_manager
+from core.dynamic_position_manager import get_dynamic_position_manager
 
 class MultiMarketTradingSystem:
     def __init__(self, config_loader: MarketConfigLoader = None):
@@ -58,6 +59,10 @@ class MultiMarketTradingSystem:
         # Initialize trading safety manager
         self.safety_manager = get_trading_safety_manager()
         print("🛡️ Trading safety manager initialized")
+        
+        # Initialize dynamic position manager
+        self.dynamic_position_manager = get_dynamic_position_manager()
+        print("🚀 Dynamic position manager initialized")
         
     def start_data_collection(self):
         """Start collecting tick data for all markets"""
@@ -195,6 +200,10 @@ class MultiMarketTradingSystem:
             self.executor.submit(self.analyze_market_signals, market)
             print(f"🎯 Started strategy analysis for {market}")
         
+        # Start dynamic position management
+        if self.dynamic_position_manager.start():
+            print("🚀 Dynamic position management active")
+        
         print("✅ Multi-market trading system is running!")
         
     def stop_trading(self):
@@ -214,6 +223,9 @@ class MultiMarketTradingSystem:
         if self.trade_streaming_started:
             print("📈 Stopping trade streaming...")
             stop_trade_streaming()
+            
+        # Stop dynamic position management
+        self.dynamic_position_manager.stop()
         
         # Shutdown thread executor
         self.executor.shutdown(wait=True)
@@ -325,6 +337,14 @@ if __name__ == "__main__":
                     print(f"🚨 TRADING SUSPENDED: {safety_status['suspension_reason']}")
                 else:
                     print(f"🛡️ Safety: Balance {safety_status['balance_percentage']:.1f}% | Open Positions: {safety_status['total_open_positions']}")
+                
+                # Show dynamic position management status
+                dpm_status = trading_system.dynamic_position_manager.get_status()
+                if dpm_status['enabled'] and dpm_status['running']:
+                    adjustments = len(trading_system.dynamic_position_manager.get_adjustment_history())
+                    print(f"🚀 Dynamic Limits: Managing {dpm_status['positions_managed']} positions | {adjustments} adjustments made")
+                elif dpm_status['enabled']:
+                    print(f"⚠️ Dynamic Limits: Enabled but not running")
                     
             except Exception:
                 pass  # Don't show if not available

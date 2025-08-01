@@ -218,11 +218,12 @@ class TradeStreamer:
                         
                         if not deal_reference:
                             return
-                            
-                        # Find the trade in database
+                        
+                        # Check if this is a trade created by our system
                         trade = trades_collection.find_one({"deal_reference": deal_reference})
                         if not trade:
-                            print(f"⚠️ Trade {deal_reference} not found in database")
+                            # This is likely a phantom/demo trade not created by our system
+                            print(f"🔍 Ignoring phantom trade {deal_reference} (not created by our system)")
                             return
                         
                         # Update trade status based on IG response
@@ -259,6 +260,12 @@ class TradeStreamer:
                         deal_reference = position_data.get("dealReference")
                         if not deal_reference:
                             return
+                        
+                        # Check if this is our trade before updating
+                        trade = trades_collection.find_one({"deal_reference": deal_reference})
+                        if not trade:
+                            print(f"🔍 Ignoring phantom position {deal_reference} (not our trade)")
+                            return
                             
                         trades_collection.update_one(
                             {"deal_reference": deal_reference},
@@ -280,6 +287,12 @@ class TradeStreamer:
                         
                         deal_reference = position_data.get("dealReference")
                         if not deal_reference:
+                            return
+                        
+                        # Check if this is our trade before updating
+                        trade = trades_collection.find_one({"deal_reference": deal_reference})
+                        if not trade:
+                            print(f"🔍 Ignoring phantom position close {deal_reference} (not our trade)")
                             return
                             
                         trades_collection.update_one(

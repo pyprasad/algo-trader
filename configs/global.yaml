@@ -22,3 +22,22 @@ strategy:
   stop_loss_pips: 10
   take_profit_pips: 20
   dynamic_atr_sltp: true
+
+# 🚀 Dynamic Position Management
+dynamic_limits:
+  enabled: true  # Feature flag - set to true to enable
+  update_interval_seconds: 30  # How often to check and adjust limits
+  confidence_threshold: 0.7  # Minimum strategy confidence to increase limits
+  max_limit_increase: 2.0  # Maximum multiplier for take profit (e.g., 2x = 40 pips instead of 20)
+  min_limit_decrease: 0.5  # Minimum multiplier for take profit (e.g., 0.5x = 10 pips instead of 20)
+  pnl_threshold_percent: 5.0  # P&L threshold to trigger limit adjustments (5% of entry)
+  strategy_lookback_minutes: 15  # How far back to analyze strategy performance
+  
+  # 🚨 Emergency Capital Protection
+  emergency_protection:
+    enabled: true  # Enable emergency stop loss adjustment
+    immediate_loss_threshold: 15  # Close position if loss exceeds this (pips)
+    rapid_check_interval: 5  # Check every 5 seconds for first 5 minutes
+    rapid_check_duration: 300  # Duration of rapid checking (5 minutes)
+    emergency_stop_multiplier: 0.7  # Tighten stop loss to 70% of original
+    adverse_signal_close: true  # Close if signal flips opposite immediately

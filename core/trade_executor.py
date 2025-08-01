@@ -168,6 +168,15 @@ def execute_trade(market_name, direction, strategy_sl=10, strategy_tp=20, strate
             
         log_trade(trade_data)
         
+        # Add position for emergency monitoring (if dynamic position management is enabled)
+        try:
+            from core.dynamic_position_manager import get_dynamic_position_manager
+            dpm = get_dynamic_position_manager()
+            if dpm.enabled and deal_reference:
+                dpm.add_position_for_emergency_monitoring(deal_reference)
+        except:
+            pass  # Don't fail trade if emergency monitoring unavailable
+        
         # Update account balance after successful trade
         current_balance = get_account_balance()
         new_balance = current_balance - required_margin
