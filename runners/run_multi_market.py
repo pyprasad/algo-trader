@@ -12,8 +12,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.multi_market_collector import MultiMarketCollector
 from core.strategy_engine import StrategyEngine
 from core.trade_executor import execute_trade
-from data.db import get_market_tick_data, get_available_markets, update_account_balance
+from data.db import get_market_tick_data, get_available_markets, get_account_balance
+from data.account_streamer import start_account_streaming, stop_account_streaming, get_live_account_data
+from data.trade_streamer import start_trade_streaming, stop_trade_streaming, get_live_active_trades
 from utils.market_config_loader import MarketConfigLoader
+from utils.trading_safety import get_trading_safety_manager
 
 class MultiMarketTradingSystem:
     def __init__(self, config_loader: MarketConfigLoader = None):
@@ -45,18 +48,20 @@ class MultiMarketTradingSystem:
         for market in valid_markets:
             self.strategy_engines[market] = StrategyEngine()
         
-        # Set initial balance from config
-        system_config = self.config_loader.get_system_config()
-        initial_balance = system_config.get('initial_balance', 10000.0)
-        update_account_balance(initial_balance)
-        print(f"💰 Initial balance set to: £{initial_balance}")
-        
         print(f"📊 Configured markets: {', '.join(valid_markets)}")
         
         # Load risk management settings
         self.risk_config = self.config_loader.get_risk_config()
         if self.risk_config:
             print(f"🛡️ Risk limits: {self.risk_config.get('max_margin_utilization_percent', 80)}% margin, {self.risk_config.get('max_exposure_per_market_percent', 20)}% per market")
+        
+        # Streaming status tracking
+        self.account_streaming_started = False
+        self.trade_streaming_started = False
+        
+        # Initialize trading safety manager
+        self.safety_manager = get_trading_safety_manager()
+        print("🛡️ Trading safety manager initialized")
         
     def start_data_collection(self):
         """Start collecting tick data for all markets"""
@@ -85,22 +90,44 @@ class MultiMarketTradingSystem:
                 # Run strategy analysis
                 signals = strategy_engine.analyze_market_conditions(prices)
                 
-                if signals and signals.get('signal') in ['BUY', 'SELL']:
-                    print(f"🎯 {market_name} SIGNAL: {signals['signal']} | RSI: {signals.get('rsi', 'N/A')} | Trend: {signals.get('trend', 'N/A')}")
+                if signals:
+                    # Always log strategy analysis results
+                    print(f"📊 {market_name} Strategy Analysis:")
+                    print(f"   Signal: {signals.get('signal', 'None')}")
+                    print(f"   RSI: {signals.get('rsi', 'N/A'):.2f}" if signals.get('rsi') else f"   RSI: N/A")
+                    print(f"   Trend: {signals.get('trend', 'N/A')}")
+                    print(f"   Price: £{signals.get('price', 'N/A'):.2f}" if signals.get('price') else f"   Price: N/A")
+                    print(f"   ATR: {signals.get('atr', 'N/A'):.2f}" if signals.get('atr') else f"   ATR: N/A")
                     
-                    # Execute trade with global balance checking
-                    trade_result = execute_trade(
-                        market_name=market_name,
-                        direction=signals['signal'],
-                        strategy_sl=signals.get('atr', 10),
-                        strategy_tp=signals.get('atr', 20) * 2,
-                        strategy_signals=signals
-                    )
-                    
-                    if 'error' in trade_result:
-                        print(f"❌ {market_name} Trade failed: {trade_result['error']}")
+                    # Check for trading signals
+                    if signals.get('signal') in ['BUY', 'SELL']:
+                        print(f"🎯 {market_name} TRADING SIGNAL: {signals['signal']}")
+                        
+                        # SAFETY CHECK: Validate trade before execution
+                        can_trade, safety_reason = self.safety_manager.validate_trade(market_name, signals['signal'])
+                        
+                        if not can_trade:
+                            print(f"🛡️ {market_name} Trade blocked by safety manager: {safety_reason}")
+                        else:
+                            print(f"✅ {market_name} Safety checks passed - Executing trade")
+                            
+                            # Execute trade with global balance checking
+                            trade_result = execute_trade(
+                                market_name=market_name,
+                                direction=signals['signal'],
+                                strategy_sl=signals.get('atr', 10),
+                                strategy_tp=signals.get('atr', 20) * 2,
+                                strategy_signals=signals
+                            )
+                            
+                            if 'error' in trade_result:
+                                print(f"❌ {market_name} Trade failed: {trade_result['error']}")
+                            else:
+                                print(f"✅ {market_name} Trade executed: {trade_result.get('dealStatus', 'Unknown')}")
                     else:
-                        print(f"✅ {market_name} Trade executed: {trade_result.get('dealStatus', 'Unknown')}")
+                        print(f"⏸️ {market_name} No trading signal - Holding position")
+                else:
+                    print(f"❌ {market_name} Strategy analysis failed - insufficient data")
                 
                 # Wait before next analysis (configurable)
                 system_config = self.config_loader.get_system_config()
@@ -117,6 +144,41 @@ class MultiMarketTradingSystem:
         print(f"📊 Trading markets: {', '.join(self.markets)}")
         
         self.running = True
+        
+        # Start account balance streaming first
+        print("💰 Starting real-time account balance streaming...")
+        account_success = start_account_streaming()
+        if account_success:
+            self.account_streaming_started = True
+            print("✅ Account balance streaming started")
+            
+            # Wait a moment for initial account data
+            time.sleep(5)
+            
+            # Show initial account data
+            try:
+                account_data = get_live_account_data()
+                if account_data.get('last_update'):
+                    print(f"💰 Live Account Data:")
+                    print(f"   Available to Deal: £{account_data.get('available_to_deal', 0):.2f}")
+                    print(f"   Available Cash: £{account_data.get('available_cash', 0):.2f}")
+                    print(f"   Current P&L: £{account_data.get('pnl', 0):.2f}")
+                    print(f"   Margin Used: £{account_data.get('margin', 0):.2f}")
+                else:
+                    print("⏳ Waiting for initial account data...")
+            except Exception as e:
+                print(f"⚠️ Could not retrieve account data: {e}")
+        else:
+            print("⚠️ Account streaming failed, using fallback balance system")
+        
+        # Start trade streaming
+        print("📈 Starting real-time trade streaming...")
+        trade_success = start_trade_streaming()
+        if trade_success:
+            self.trade_streaming_started = True
+            print("✅ Trade streaming started")
+        else:
+            print("⚠️ Trade streaming failed, using database-only trade tracking")
         
         # Start data collection
         self.start_data_collection()
@@ -141,6 +203,16 @@ class MultiMarketTradingSystem:
         
         # Stop data collection
         self.collector.stop_streaming()
+        
+        # Stop account streaming
+        if self.account_streaming_started:
+            print("💰 Stopping account balance streaming...")
+            stop_account_streaming()
+        
+        # Stop trade streaming
+        if self.trade_streaming_started:
+            print("📈 Stopping trade streaming...")
+            stop_trade_streaming()
         
         # Shutdown thread executor
         self.executor.shutdown(wait=True)
@@ -223,7 +295,26 @@ if __name__ == "__main__":
         while True:
             time.sleep(60)
             status = trading_system.get_system_status()
+            
+            # Show system status with live account data
             print(f"📊 System Status: Running={status['running']} | Markets={len(status['markets'])} | DB Markets={len(status['available_markets_in_db'])}")
+            
+            # Show live account balance and safety status
+            try:
+                current_balance = get_account_balance()
+                account_data = get_live_account_data()
+                if account_data.get('last_update'):
+                    print(f"💰 Live Balance: £{current_balance:.2f} | P&L: £{account_data.get('pnl', 0):.2f} | Margin: £{account_data.get('margin', 0):.2f}")
+                
+                # Show safety status
+                safety_status = trading_system.safety_manager.get_trading_status()
+                if safety_status['trading_suspended']:
+                    print(f"🚨 TRADING SUSPENDED: {safety_status['suspension_reason']}")
+                else:
+                    print(f"🛡️ Safety: Balance {safety_status['balance_percentage']:.1f}% | Open Positions: {safety_status['total_open_positions']}")
+                    
+            except Exception:
+                pass  # Don't show if not available
             
     except KeyboardInterrupt:
         print("\n⚠️ Interrupted by user")

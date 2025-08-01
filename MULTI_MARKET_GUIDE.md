@@ -13,16 +13,28 @@ Your algo-trader now supports unlimited markets simultaneously with proper datab
 - **Auto-Creation**: Tables created automatically when new markets are added
 - **Unified Processing**: All markets use same strategy logic with market-specific data
 
-### 2. **Global Balance Management**
-- **Pre-Trade Validation**: Every trade checks account balance before execution
-- **Margin Calculation**: Dynamic margin requirements per market
-- **Real-time Updates**: Balance updated after each trade
-- **Risk Management**: Exposure tracking and utilization monitoring
+### 2. **🆕 Real-Time Account Balance Streaming**
+- **Live Account Data**: Streams real-time balance from IG API
+- **Available to Deal**: Uses actual available trading balance
+- **Live P&L Tracking**: Real-time profit/loss monitoring
+- **Margin Monitoring**: Live margin utilization tracking
+- **No Hardcoded Balances**: Dynamic balance updates from market data
 
-### 3. **Multi-Market Architecture**
-- **Concurrent Streaming**: Multiple markets streamed simultaneously
+### 3. **Enhanced Balance Management**
+- **Pre-Trade Validation**: Every trade checks live account balance
+- **Margin Calculation**: Dynamic margin requirements per market
+- **Real-time Updates**: Balance streamed continuously from IG
+- **Risk Management**: Live exposure tracking and utilization monitoring
+
+### 4. **Multi-Market Architecture**
+- **Concurrent Streaming**: Multiple markets + account data streamed simultaneously
 - **Market-Specific Strategies**: Each market has its own strategy engine instance
 - **Thread-Safe Operations**: Safe concurrent processing across markets
+
+### 5. **Configuration-Driven System**
+- **Market Management**: Easy add/remove markets via config files
+- **CLI Tools**: Interactive and command-line market management
+- **Validation**: Automatic configuration validation and error checking
 
 ## 📁 New/Updated Files
 
@@ -33,10 +45,13 @@ Your algo-trader now supports unlimited markets simultaneously with proper datab
 
 ### New Files:
 - `data/multi_market_collector.py` - Multi-market data collection system
+- `data/account_streamer.py` - 🆕 Real-time account balance streaming
 - `runners/run_multi_market.py` - Complete multi-market trading system
-- `utils/balance_manager.py` - Comprehensive balance management utility
+- `utils/balance_manager.py` - Enhanced balance management with live streaming
+- `utils/market_config_loader.py` - Configuration-driven market management
 - `test_multi_market.py` - Test suite for multi-market functionality
 - `demo_multi_market.py` - Demo script showing multi-market capabilities
+- `demo_live_account.py` - 🆕 Demo of live account streaming
 
 ## 🚀 Usage
 
@@ -93,11 +108,17 @@ python3.13 test_multi_market.py
 # Test configuration system
 python3.13 test_config_system.py
 
+# Test live account streaming
+python3.13 test_account_streaming.py
+
 # Run configuration demo
 python3.13 demo_config_system.py
 
 # Run market data demo  
 python3.13 demo_multi_market.py
+
+# Demo live account streaming
+python3.13 demo_live_account.py
 ```
 
 ## 📊 Database Structure

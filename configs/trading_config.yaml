@@ -5,8 +5,12 @@ risk_management:
   emergency_stop_loss_percent: 10
   max_exposure_per_market_percent: 20
   max_margin_utilization_percent: 80
+  minimum_balance_percent: 30  # Stop trading when balance drops below 30%
+  one_trade_per_market: true  # Only allow one open trade per market
+  initial_balance_threshold: 1000.0  # Reference balance for 30% calculation
 system:
   analysis_interval_seconds: 60
   data_collection_timeout_seconds: 30
-  initial_balance: 10000.0
+  use_live_account_streaming: true  # Use real-time account balance
+  fallback_balance: 10000.0  # Only used if live streaming fails
   max_concurrent_markets: 5

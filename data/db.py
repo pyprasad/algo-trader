@@ -98,7 +98,19 @@ def update_trade_status(trade_id, status: str, profit_loss: float = None):
     print(f"📊 Trade {trade_id} updated: Status={status}, P/L={profit_loss}")
 
 def get_account_balance():
-    """Get current account balance from database"""
+    """Get current account balance from database or live stream"""
+    # First try to get live balance if streaming is active
+    try:
+        from data.account_streamer import get_live_account_balance
+        live_balance = get_live_account_balance()
+        if live_balance > 0:
+            return live_balance
+    except ImportError:
+        pass  # Account streamer not available
+    except Exception:
+        pass  # Live streaming not active, fall back to database
+    
+    # Fall back to database balance
     balance_doc = balance_collection.find_one({"type": "current"})
     if balance_doc:
         return balance_doc.get("balance", 0.0)

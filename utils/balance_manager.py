@@ -23,6 +23,12 @@ from data.db import (
     get_open_trades,
     trades_collection
 )
+
+try:
+    from data.account_streamer import get_live_account_data, get_account_streamer
+    LIVE_STREAMING_AVAILABLE = True
+except ImportError:
+    LIVE_STREAMING_AVAILABLE = False
 from datetime import datetime, timedelta
 import argparse
 
@@ -149,9 +155,36 @@ class BalanceManager:
         print("💰 ACCOUNT BALANCE SUMMARY")
         print("="*60)
         
-        # Current balance
+        # Show live account data if available
+        if LIVE_STREAMING_AVAILABLE:
+            try:
+                streamer = get_account_streamer()
+                if streamer.is_streaming():
+                    account_data = get_live_account_data()
+                    if account_data.get('last_update'):
+                        print("📡 LIVE ACCOUNT DATA (Real-time)")
+                        print(f"Available to Deal: £{account_data.get('available_to_deal', 0):,.2f}")
+                        print(f"Available Cash: £{account_data.get('available_cash', 0):,.2f}")
+                        print(f"Current P&L: £{account_data.get('pnl', 0):,.2f}")
+                        print(f"Funds: £{account_data.get('funds', 0):,.2f}")
+                        print(f"Equity: £{account_data.get('equity', 0):,.2f}")
+                        print(f"Margin Used: £{account_data.get('margin', 0):,.2f}")
+                        print(f"Last Update: {account_data.get('last_update', 'N/A')}")
+                        
+                        # Calculate margin utilization from live data
+                        margin_util = streamer.get_margin_utilization()
+                        print(f"Live Margin Utilization: {margin_util:.1f}%")
+                        print("-" * 60)
+                    else:
+                        print("📡 Live streaming active but no data yet...")
+                else:
+                    print("📡 Live streaming available but not active")
+            except Exception as e:
+                print(f"⚠️ Live streaming error: {e}")
+        
+        # Current balance (fallback or confirmation)
         balance = self.get_current_balance()
-        print(f"Current Balance: £{balance:,.2f}")
+        print(f"Current Trading Balance: £{balance:,.2f}")
         
         # Margin utilization
         margin_info = self.get_margin_utilization()
