@@ -1,0 +1,24 @@
+# configs/global.yaml
+
+ig:
+  api_key: "3772057d9d126d6d19d7cb6ec146404de00e5421"
+  username: "yuganp"
+  password: "Testing@123"
+  base_url: "https://demo-api.ig.com/gateway/deal"
+  session_duration: 3600  # in seconds
+  cache_file: "session_cache.json"
+  log_file: "ig_streaming.log"
+
+mongodb:
+  uri: "mongodb://127.0.0.1:27017"
+  database: "ftse100_scalping_bot"
+  collection: "ftse100"
+
+strategy:
+  mode: "HISTORICAL"  # or LIVE
+  rsi_period: 14
+  rsi_buy_threshold: 80
+  rsi_sell_threshold: 20
+  stop_loss_pips: 10
+  take_profit_pips: 20
+  dynamic_atr_sltp: true

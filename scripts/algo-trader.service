@@ -1,0 +1,38 @@
+# scripts/algo-trader.service
+# Systemd service file for continuous algo trading
+# 
+# Installation (Linux):
+# 1. Copy this file to /etc/systemd/system/
+# 2. Update paths and user as needed
+# 3. sudo systemctl daemon-reload
+# 4. sudo systemctl enable algo-trader
+# 5. sudo systemctl start algo-trader
+
+[Unit]
+Description=Algorithmic Trading Bot - FTSE 100
+After=network.target mongod.service
+Wants=mongod.service
+
+[Service]
+Type=simple
+User=trading  # Change to your user
+Group=trading # Change to your group
+WorkingDirectory=/Users/my/mayu_solutions/algo-trader
+Environment=PYTHONPATH=/Users/my/mayu_solutions/algo-trader
+ExecStart=/Users/my/mayu_solutions/algo-trader/venv/bin/python runners/run_continuous.py
+ExecStop=/bin/kill -SIGTERM $MAINPID
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=algo-trader
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/Users/my/mayu_solutions/algo-trader
+
+[Install]
+WantedBy=multi-user.target

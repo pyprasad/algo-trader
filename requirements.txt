@@ -1,0 +1,15 @@
+pandas
+numpy
+scikit-learn
+hmmlearn
+yfinance
+statsmodels
+streamlit
+requests
+websocket-client
+pymongo
+PyYAML
+python-dotenv
+lightstreamer-client-lib==1.0.3
+pytz
+joblib

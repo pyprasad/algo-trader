@@ -1,0 +1,5 @@
+FTSE 100:
+  epic: "IX.D.FTSE.DAILY.IP"
+  trade_size: 1
+  stop_loss: 10
+  take_profit: 20
