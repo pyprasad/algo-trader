@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from data.multi_market_collector import MultiMarketCollector
 from core.strategy_engine import StrategyEngine
 from core.trade_executor import execute_trade
-from data.db import get_market_tick_data, get_available_markets, get_account_balance
+from data.db import get_market_tick_data, get_available_markets, get_account_balance, get_trade_lifecycle_status
 from data.account_streamer import start_account_streaming, stop_account_streaming, get_live_account_data
 from data.trade_streamer import start_trade_streaming, stop_trade_streaming, get_live_active_trades
 from utils.market_config_loader import MarketConfigLoader
@@ -98,6 +98,7 @@ class MultiMarketTradingSystem:
                     print(f"   Trend: {signals.get('trend', 'N/A')}")
                     print(f"   Price: £{signals.get('price', 'N/A'):.2f}" if signals.get('price') else f"   Price: N/A")
                     print(f"   ATR: {signals.get('atr', 'N/A'):.2f}" if signals.get('atr') else f"   ATR: N/A")
+                    print(f"   Momentum: {signals.get('momentum', 'N/A'):.2f}%" if signals.get('momentum') else f"   Momentum: N/A")
                     
                     # Check for trading signals
                     if signals.get('signal') in ['BUY', 'SELL']:
@@ -298,6 +299,20 @@ if __name__ == "__main__":
             
             # Show system status with live account data
             print(f"📊 System Status: Running={status['running']} | Markets={len(status['markets'])} | DB Markets={len(status['available_markets_in_db'])}")
+            
+            # Show trade lifecycle status for all markets
+            try:
+                overall_status = get_trade_lifecycle_status()
+                print(f"📈 Trade Status: Pending={overall_status['pending']} | Open={overall_status['open']} | Closed={overall_status['closed']} | Rejected={overall_status['rejected']}")
+                
+                # Show per-market status if there are active trades
+                if overall_status['total_active'] > 0:
+                    for market in trading_system.markets:
+                        market_status = get_trade_lifecycle_status(market)
+                        if market_status['total_active'] > 0:
+                            print(f"   {market}: {market_status['pending']}P + {market_status['open']}O = {market_status['total_active']} active")
+            except Exception as e:
+                print(f"⚠️ Trade status error: {e}")
             
             # Show live account balance and safety status
             try:

@@ -16,7 +16,7 @@ from utils.auth_helper import authenticate
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.config_loader import load_global_config, load_asset_config
-from data.db import log_trade, check_sufficient_balance, get_account_balance, update_account_balance
+from data.db import log_trade, check_sufficient_balance, get_account_balance, update_account_balance, can_open_new_trade, get_trade_lifecycle_status
 from datetime import datetime
 
 global_config = load_global_config()
@@ -110,6 +110,12 @@ def execute_trade(market_name, direction, strategy_sl=10, strategy_tp=20, strate
     Master function to place trade after validating market rules, balance check, and log to MongoDB.
     """
     execution_start = datetime.utcnow()
+    
+    # Check if we can open a new trade for this market (no existing positions)
+    if not can_open_new_trade(market_name):
+        trade_status = get_trade_lifecycle_status(market_name)
+        print(f"❌ TRADE BLOCKED: {market_name} has active positions - {trade_status}")
+        return {"error": "Active position exists", "trade_status": trade_status}
     
     # Load market-specific config
     asset_config = load_asset_config(market_name)

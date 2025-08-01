@@ -17,8 +17,8 @@ mongodb:
 strategy:
   mode: "HISTORICAL"  # or LIVE
   rsi_period: 14
-  rsi_buy_threshold: 80
-  rsi_sell_threshold: 20
+  rsi_buy_threshold: 70  # More sensitive - was 80
+  rsi_sell_threshold: 30  # More sensitive - was 20
   stop_loss_pips: 10
   take_profit_pips: 20
   dynamic_atr_sltp: true

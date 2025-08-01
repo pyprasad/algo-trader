@@ -59,8 +59,9 @@ def run_strategy(asset="FTSE 100", lookback_minutes=60, timeframe='1min'):
     df["rsi"] = compute_rsi(df["midprice"], period=RSI_PERIOD)
     df["atr"] = compute_atr(df["midprice"]) if DYNAMIC_ATR_SLTP else None
 
-    # 2.5 Compute EMA for trend filtering
+    # 2.5 Compute EMA for trend filtering and momentum
     df["ema"] = compute_ema(df["midprice"], span=50)
+    df["momentum"] = df["midprice"].pct_change(periods=5) * 100
     latest_ema = df["ema"].iloc[-1]
     latest_price = df["midprice"].iloc[-1]
 
@@ -84,7 +85,8 @@ def run_strategy(asset="FTSE 100", lookback_minutes=60, timeframe='1min'):
         atr=latest["atr"] if DYNAMIC_ATR_SLTP else None,
         regime=regime,
         thresholds=(BUY_THRESHOLD, SELL_THRESHOLD),
-        trend=trend
+        trend=trend,
+        momentum=latest["momentum"] if pd.notna(latest["momentum"]) else None
     )
 
     # 5. Logging the decision
@@ -99,7 +101,8 @@ def run_strategy(asset="FTSE 100", lookback_minutes=60, timeframe='1min'):
         "atr": float(latest["atr"]) if DYNAMIC_ATR_SLTP else None,
         "regime": regime,
         "trend": trend,
-        "signal": signal
+        "signal": signal,
+        "momentum": float(latest["momentum"]) if pd.notna(latest["momentum"]) else None
     }
 
     return signal, strategy_context
@@ -145,6 +148,9 @@ class StrategyEngine:
         df["atr"] = compute_atr(df["price"]) if self.dynamic_atr_sltp else None
         df["ema"] = compute_ema(df["price"], span=50)
         
+        # Compute momentum (rate of change over last 5 periods)
+        df["momentum"] = df["price"].pct_change(periods=5) * 100
+        
         # Get latest values
         latest = df.iloc[-1]
         latest_price = latest["price"]
@@ -167,7 +173,8 @@ class StrategyEngine:
             atr=latest["atr"] if self.dynamic_atr_sltp else None,
             regime=regime,
             thresholds=(self.buy_threshold, self.sell_threshold),
-            trend=trend
+            trend=trend,
+            momentum=latest["momentum"] if pd.notna(latest["momentum"]) else None
         )
         
         # Create strategy context
@@ -177,7 +184,8 @@ class StrategyEngine:
             "regime": regime,
             "trend": trend,
             "signal": signal,
-            "price": float(latest_price)
+            "price": float(latest_price),
+            "momentum": float(latest["momentum"]) if pd.notna(latest["momentum"]) else None
         }
         
         return strategy_context

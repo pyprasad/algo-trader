@@ -54,7 +54,7 @@ def log_tick(market: str, bid: float, offer: float):
     print(f"📥 Tick logged to {collection_name}: {market} | Bid: {bid} | Offer: {offer}")
 
 def log_trade(trade_data: dict):
-    """Insert executed trade into MongoDB trades collection"""
+    """Insert executed trade into MongoDB trades collection with lifecycle tracking"""
     trade_document = {
         "timestamp": datetime.utcnow(),
         "market": trade_data.get("market"),
@@ -64,17 +64,29 @@ def log_trade(trade_data: dict):
         "stop_loss": trade_data.get("stop_loss"),
         "take_profit": trade_data.get("take_profit"),
         "deal_reference": trade_data.get("deal_reference"),
-        "deal_status": trade_data.get("deal_status"),
+        "deal_status": trade_data.get("deal_status", "PENDING"),
+        
+        # Lifecycle tracking fields
+        "deal_id": None,  # Will be set when trade is confirmed
+        "actual_entry_price": None,  # Actual price when trade executed
+        "actual_stop_level": None,  # Actual stop loss level set
+        "actual_limit_level": None,  # Actual take profit level set
+        "confirmation_timestamp": None,  # When trade was confirmed by IG
+        "close_timestamp": None,  # When position was closed
+        "close_level": None,  # Price at which position was closed
+        "last_update": datetime.utcnow(),
+        
         "strategy_signals": {
             "rsi": trade_data.get("rsi"),
             "atr": trade_data.get("atr"),
             "regime": trade_data.get("regime"),
             "trend": trade_data.get("trend"),
-            "signal": trade_data.get("signal")
+            "signal": trade_data.get("signal"),
+            "momentum": trade_data.get("momentum")
         },
         "profit_loss": trade_data.get("profit_loss", 0),
         "execution_time": trade_data.get("execution_time"),
-        "status": "OPEN"  # OPEN, CLOSED, REJECTED
+        "status": "PENDING"  # PENDING -> OPEN -> CLOSED/REJECTED
     }
     
     result = trades_collection.insert_one(trade_document)
@@ -150,3 +162,36 @@ def get_available_markets():
             if latest_tick and "market" in latest_tick:
                 markets.append(latest_tick["market"])
     return markets
+
+def can_open_new_trade(market: str) -> bool:
+    """Check if we can open a new trade for this market (no open positions)"""
+    open_trades = get_open_trades(market)
+    pending_trades = list(trades_collection.find({"market": market, "status": "PENDING"}))
+    
+    total_active = len(open_trades) + len(pending_trades)
+    
+    if total_active > 0:
+        print(f"⚠️ Cannot open new {market} trade: {len(open_trades)} open + {len(pending_trades)} pending positions")
+        return False
+    
+    return True
+
+def get_trade_lifecycle_status(market: str = None):
+    """Get summary of trade lifecycle for monitoring"""
+    query = {}
+    if market:
+        query["market"] = market
+    
+    pending_count = trades_collection.count_documents({**query, "status": "PENDING"})
+    open_count = trades_collection.count_documents({**query, "status": "OPEN"})
+    closed_count = trades_collection.count_documents({**query, "status": "CLOSED"})
+    rejected_count = trades_collection.count_documents({**query, "status": "REJECTED"})
+    
+    return {
+        "market": market or "ALL",
+        "pending": pending_count,
+        "open": open_count,
+        "closed": closed_count,
+        "rejected": rejected_count,
+        "total_active": pending_count + open_count
+    }
