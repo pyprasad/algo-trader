@@ -113,20 +113,41 @@ class TradeStreamer:
                 
                 def _handle_trade_confirmation(self, update):
                     """Handle trade confirmation (CONFIRMS) - tracks new trades"""
-                    # Get available fields safely
-                    deal_reference = update.getValue("dealReference")
-                    deal_status = update.getValue("dealStatus") 
-                    status = update.getValue("status")
+                    import json
+                    
+                    # Get CONFIRMS data (it's JSON string)
+                    confirms_data = update.getValue("CONFIRMS")
+                    if not confirms_data:
+                        print("❌ No CONFIRMS data in update")
+                        return
+                    
+                    try:
+                        # Parse JSON data
+                        trade_data = json.loads(confirms_data)
+                        deal_reference = trade_data.get("dealReference")
+                        deal_status = trade_data.get("dealStatus")
+                        status = trade_data.get("status")
+                    except json.JSONDecodeError as e:
+                        print(f"❌ Failed to parse CONFIRMS JSON: {e}")
+                        print(f"   Raw data: {confirms_data}")
+                        return
                     
                     print(f"📈 TRADE CONFIRMATION:")
                     print(f"   Reference: {deal_reference}")
                     print(f"   Deal Status: {deal_status} ({'✅ ACCEPTED' if deal_status == 'ACCEPTED' else '❌ REJECTED' if deal_status else 'UNKNOWN'})")
                     print(f"   Position Status: {status}")
                     
-                    # Store minimal confirmation with available data
+                    # Store comprehensive confirmation with parsed data
                     confirmation = {
                         "type": "CONFIRMATION",
                         "deal_reference": deal_reference,
+                        "deal_id": trade_data.get("dealId"),
+                        "epic": trade_data.get("epic"),
+                        "direction": trade_data.get("direction"),
+                        "size": trade_data.get("size"),
+                        "level": trade_data.get("level"),
+                        "stop_level": trade_data.get("stopLevel"),
+                        "limit_level": trade_data.get("limitLevel"),
                         "deal_status": deal_status,
                         "status": status,
                         "timestamp": datetime.utcnow()
@@ -137,52 +158,172 @@ class TradeStreamer:
                     # Update local database trade status if we have minimum required data
                     if deal_reference and deal_status:
                         print(f"💾 Updating database for trade {deal_reference}")
-                        # For now, just log that we received a confirmation
-                        # We'll enhance this once we confirm the streaming works
+                        self._update_trade_in_database(trade_data)
                 
                 def _handle_position_update(self, update):
                     """Handle open position update (OPU) - tracks position lifecycle"""
-                    # Get available fields safely
-                    deal_reference = update.getValue("dealReference")
-                    status = update.getValue("status")  # OPEN, UPDATED, DELETED (closed)
-                    deal_status = update.getValue("dealStatus")
+                    import json
+                    
+                    # Get OPU data (it's JSON string)
+                    opu_data = update.getValue("OPU")
+                    if not opu_data:
+                        print("❌ No OPU data in update")
+                        return
+                    
+                    try:
+                        # Parse JSON data
+                        position_data = json.loads(opu_data)
+                        deal_reference = position_data.get("dealReference")
+                        status = position_data.get("status")  # OPEN, UPDATED, DELETED (closed)
+                        deal_status = position_data.get("dealStatus")
+                    except json.JSONDecodeError as e:
+                        print(f"❌ Failed to parse OPU JSON: {e}")
+                        print(f"   Raw data: {opu_data}")
+                        return
                     
                     print(f"📊 POSITION UPDATE:")
                     print(f"   Reference: {deal_reference}")
                     print(f"   Status: {status} ({'🟢 OPEN' if status == 'OPEN' else '🔄 UPDATED' if status == 'UPDATED' else '🔴 CLOSED' if status == 'DELETED' else status})")
                     print(f"   Deal Status: {deal_status}")
                     
-                    # Store minimal position update
+                    # Store comprehensive position update
                     position_update = {
                         "type": "POSITION_UPDATE",
                         "deal_reference": deal_reference,
+                        "position_data": position_data,  # Store full position data
                         "status": status,
                         "deal_status": deal_status,
                         "received_at": datetime.utcnow()
                     }
                     
-                    # Basic lifecycle tracking
+                    # Basic lifecycle tracking and database updates
                     if status == "DELETED" and deal_reference:  # Position closed
                         print(f"🔴 POSITION CLOSED: {deal_reference}")
                         print(f"🎯 Trade {deal_reference} completed - ready for new trades!")
+                        self._close_trade_in_database(position_data)
                     elif status == "OPEN" and deal_reference:
                         print(f"🟢 POSITION OPENED: {deal_reference}")
+                        self._confirm_trade_in_database(position_data)
                     elif status == "UPDATED" and deal_reference:
                         print(f"🔄 POSITION UPDATED: {deal_reference}")
+                        
+                def _update_trade_in_database(self, trade_data):
+                    """Update trade status from PENDING to confirmed based on streaming data"""
+                    try:
+                        from data.db import trades_collection
+                        
+                        deal_reference = trade_data.get("dealReference")
+                        deal_status = trade_data.get("dealStatus")
+                        status = trade_data.get("status")
+                        
+                        if not deal_reference:
+                            return
+                            
+                        # Find the trade in database
+                        trade = trades_collection.find_one({"deal_reference": deal_reference})
+                        if not trade:
+                            print(f"⚠️ Trade {deal_reference} not found in database")
+                            return
+                        
+                        # Update trade status based on IG response
+                        update_data = {
+                            "deal_id": trade_data.get("dealId"),
+                            "actual_entry_price": trade_data.get("level"),
+                            "actual_stop_level": trade_data.get("stopLevel"),
+                            "actual_limit_level": trade_data.get("limitLevel"),
+                            "last_update": datetime.utcnow()
+                        }
+                        
+                        if deal_status == "ACCEPTED" and status == "OPEN":
+                            update_data["status"] = "OPEN"
+                            update_data["confirmation_timestamp"] = datetime.utcnow()
+                            print(f"✅ Trade {deal_reference}: PENDING → OPEN")
+                        elif deal_status == "REJECTED":
+                            update_data["status"] = "REJECTED"
+                            print(f"❌ Trade {deal_reference}: PENDING → REJECTED")
+                        
+                        # Apply update
+                        trades_collection.update_one(
+                            {"deal_reference": deal_reference},
+                            {"$set": update_data}
+                        )
+                        
+                    except Exception as e:
+                        print(f"❌ Error updating trade in database: {e}")
+                
+                def _confirm_trade_in_database(self, position_data):
+                    """Confirm trade is now OPEN"""
+                    try:
+                        from data.db import trades_collection
+                        
+                        deal_reference = position_data.get("dealReference")
+                        if not deal_reference:
+                            return
+                            
+                        trades_collection.update_one(
+                            {"deal_reference": deal_reference},
+                            {"$set": {
+                                "status": "OPEN",
+                                "confirmation_timestamp": datetime.utcnow(),
+                                "last_update": datetime.utcnow()
+                            }}
+                        )
+                        print(f"✅ Confirmed trade {deal_reference} as OPEN")
+                        
+                    except Exception as e:
+                        print(f"❌ Error confirming trade: {e}")
+                
+                def _close_trade_in_database(self, position_data):
+                    """Mark trade as CLOSED"""
+                    try:
+                        from data.db import trades_collection
+                        
+                        deal_reference = position_data.get("dealReference")
+                        if not deal_reference:
+                            return
+                            
+                        trades_collection.update_one(
+                            {"deal_reference": deal_reference},
+                            {"$set": {
+                                "status": "CLOSED",
+                                "close_timestamp": datetime.utcnow(),
+                                "close_level": position_data.get("level"),
+                                "last_update": datetime.utcnow()
+                            }}
+                        )
+                        print(f"🔴 Closed trade {deal_reference}")
+                        
+                    except Exception as e:
+                        print(f"❌ Error closing trade: {e}")
                 
                 def _handle_working_order_update(self, update):
                     """Handle working order update (WOU)"""
-                    print(f"📋 WORKING ORDER UPDATE RECEIVED")
+                    import json
                     
-                    # Store minimal working order update
+                    # Get WOU data (it's JSON string)
+                    wou_data = update.getValue("WOU")
+                    if not wou_data:
+                        print("❌ No WOU data in update")
+                        return
+                    
+                    try:
+                        # Parse JSON data
+                        order_data = json.loads(wou_data)
+                        print(f"📋 WORKING ORDER UPDATE:")
+                        print(f"   Order Data: {order_data}")
+                    except json.JSONDecodeError as e:
+                        print(f"❌ Failed to parse WOU JSON: {e}")
+                        print(f"   Raw data: {wou_data}")
+                        return
+                    
+                    # Store comprehensive working order update
                     order_update = {
                         "type": "WORKING_ORDER_UPDATE",
-                        "timestamp": datetime.utcnow(),
-                        "raw_update": str(update)
+                        "order_data": order_data,
+                        "timestamp": datetime.utcnow()
                     }
                     
-                    # For now, just log that we received it
-                    print(f"   Working order update logged at {order_update['timestamp']}")
+                    self.streamer.working_orders.append(order_update)
                 
                 def _handle_general_trade_update(self, update):
                     """Handle other trade updates"""

@@ -10,7 +10,7 @@ import signal
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from data.multi_market_collector import MultiMarketCollector
-from core.strategy_engine import StrategyEngine
+from core.enhanced_strategy_engine import get_enhanced_strategy_engine
 from core.trade_executor import execute_trade
 from data.db import get_market_tick_data, get_available_markets, get_account_balance, get_trade_lifecycle_status
 from data.account_streamer import start_account_streaming, stop_account_streaming, get_live_account_data
@@ -40,13 +40,9 @@ class MultiMarketTradingSystem:
         
         self.markets = valid_markets
         self.collector = MultiMarketCollector(valid_markets)
-        self.strategy_engines = {}
+        self.enhanced_strategy_engine = get_enhanced_strategy_engine()
         self.running = False
         self.executor = ThreadPoolExecutor(max_workers=len(valid_markets) + 1)
-        
-        # Initialize strategy engines for each market
-        for market in valid_markets:
-            self.strategy_engines[market] = StrategyEngine()
         
         print(f"📊 Configured markets: {', '.join(valid_markets)}")
         
@@ -70,9 +66,8 @@ class MultiMarketTradingSystem:
         
     def analyze_market_signals(self, market_name):
         """
-        Continuously analyze signals for a specific market
+        Continuously analyze signals for a specific market using enhanced engine
         """
-        strategy_engine = self.strategy_engines[market_name]
         
         while self.running:
             try:
@@ -87,18 +82,23 @@ class MultiMarketTradingSystem:
                 # Extract prices for analysis
                 prices = [tick['bid'] for tick in reversed(recent_ticks)]  # Reverse to get chronological order
                 
-                # Run strategy analysis
-                signals = strategy_engine.analyze_market_conditions(prices)
+                # Run enhanced strategy analysis with market name for ML/sentiment
+                signals = self.enhanced_strategy_engine.analyze_market_conditions(prices, market_name)
                 
                 if signals:
-                    # Always log strategy analysis results
-                    print(f"📊 {market_name} Strategy Analysis:")
-                    print(f"   Signal: {signals.get('signal', 'None')}")
-                    print(f"   RSI: {signals.get('rsi', 'N/A'):.2f}" if signals.get('rsi') else f"   RSI: N/A")
-                    print(f"   Trend: {signals.get('trend', 'N/A')}")
-                    print(f"   Price: £{signals.get('price', 'N/A'):.2f}" if signals.get('price') else f"   Price: N/A")
-                    print(f"   ATR: {signals.get('atr', 'N/A'):.2f}" if signals.get('atr') else f"   ATR: N/A")
-                    print(f"   Momentum: {signals.get('momentum', 'N/A'):.2f}%" if signals.get('momentum') else f"   Momentum: N/A")
+                    # Enhanced strategy analysis results with more details
+                    print(f"🚀 {market_name} Enhanced Strategy Analysis:")
+                    print(f"   🎯 Final Signal: {signals.get('signal', 'HOLD')} (confidence: {signals.get('confidence', 0):.2f})")
+                    print(f"   📊 Composite Score: {signals.get('composite_score', 0):.3f}")
+                    print(f"   💪 Signal Strength: {signals.get('signal_strength', 0):.2f}")
+                    print(f"   📈 Technical: RSI {signals.get('rsi', 0):.1f} | {signals.get('trend', 'N/A')} | {signals.get('regime', 'N/A')}")
+                    print(f"   💰 Price: £{signals.get('price', 0):.2f} | Momentum: {signals.get('momentum', 0):.1f}%")
+                    
+                    # Show individual signal breakdown
+                    if 'signal_breakdown' in signals:
+                        print(f"   🔍 Signal Breakdown:")
+                        for signal_type, details in signals['signal_breakdown'].items():
+                            print(f"      {signal_type.replace('_', ' ').title()}: {details}")
                     
                     # Check for trading signals
                     if signals.get('signal') in ['BUY', 'SELL']:
@@ -226,8 +226,7 @@ class MultiMarketTradingSystem:
             # Add to collector
             self.collector.add_market(market_name)
             
-            # Add strategy engine
-            self.strategy_engines[market_name] = StrategyEngine()
+            # Enhanced strategy engine is shared across all markets
             
             # Add to markets list
             self.markets.append(market_name)
@@ -245,10 +244,6 @@ class MultiMarketTradingSystem:
         if market_name in self.markets:
             # Remove from collector
             self.collector.remove_market(market_name)
-            
-            # Remove strategy engine
-            if market_name in self.strategy_engines:
-                del self.strategy_engines[market_name]
             
             # Remove from markets list
             self.markets.remove(market_name)
@@ -303,14 +298,17 @@ if __name__ == "__main__":
             # Show trade lifecycle status for all markets
             try:
                 overall_status = get_trade_lifecycle_status()
-                print(f"📈 Trade Status: Pending={overall_status['pending']} | Open={overall_status['open']} | Closed={overall_status['closed']} | Rejected={overall_status['rejected']}")
+                print(f"📈 Trade Status: Open={overall_status['open']} | Pending={overall_status['pending']} | Closed={overall_status['closed']} | Rejected={overall_status['rejected']} | Timeout={overall_status['timeout']}")
                 
-                # Show per-market status if there are active trades
-                if overall_status['total_active'] > 0:
-                    for market in trading_system.markets:
-                        market_status = get_trade_lifecycle_status(market)
-                        if market_status['total_active'] > 0:
-                            print(f"   {market}: {market_status['pending']}P + {market_status['open']}O = {market_status['total_active']} active")
+                # Show per-market status if there are active or pending trades
+                active_markets = []
+                for market in trading_system.markets:
+                    market_status = get_trade_lifecycle_status(market)
+                    if market_status['total_active'] > 0 or market_status['pending_unconfirmed'] > 0:
+                        active_markets.append(f"{market}: {market_status['open']}O + {market_status['pending_unconfirmed']}P")
+                
+                if active_markets:
+                    print(f"   Active Markets: {' | '.join(active_markets)}")
             except Exception as e:
                 print(f"⚠️ Trade status error: {e}")
             

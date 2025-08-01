@@ -1,0 +1,103 @@
+# configs/sentiment_config.yaml
+
+# News Sentiment Analysis Configuration
+
+news_sources:
+  # API-based sources (require API keys)
+  newsapi:
+    enabled: false
+    api_key: "YOUR_NEWSAPI_KEY"  # Get from https://newsapi.org/
+    queries:
+      - "DAX OR \"German stock market\" OR \"Germany economy\""
+      - "FTSE OR \"UK stock market\" OR \"British economy\""
+      - "EUR OR \"European Central Bank\" OR ECB"
+    
+  alpha_vantage:
+    enabled: false
+    api_key: "YOUR_ALPHA_VANTAGE_KEY"  # Get from https://www.alphavantage.co/
+    
+  polygon:
+    enabled: false 
+    api_key: "YOUR_POLYGON_KEY"  # Get from https://polygon.io/
+
+  # Free sources (no API key required)
+  free_sources:
+    enabled: true
+    rss_feeds:
+      - "https://feeds.finance.yahoo.com/rss/2.0/headline"
+      - "https://www.investing.com/rss/news.rss"
+      - "https://feeds.bloomberg.com/markets/news.rss"
+
+sentiment_analysis:
+  # Sentiment scoring thresholds
+  thresholds:
+    very_bearish: -1.5
+    bearish: -0.5
+    neutral: 0.0
+    bullish: 0.5
+    very_bullish: 1.5
+  
+  # Trading signal generation
+  trading_signals:
+    min_confidence: 0.3  # Minimum confidence to generate signals
+    buy_threshold: 0.8   # Sentiment score threshold for BUY signals
+    sell_threshold: -0.8 # Sentiment score threshold for SELL signals
+    
+  # Keyword weights for financial sentiment
+  financial_keywords:
+    positive:
+      bullish: 2.0
+      rally: 1.5
+      surge: 1.8
+      gain: 1.2
+      growth: 1.3
+      profit: 1.4
+      strong: 1.1
+      boost: 1.6
+      soar: 1.9
+      
+    negative:
+      bearish: -2.0
+      crash: -2.5
+      plunge: -2.2
+      decline: -1.4
+      loss: -1.5
+      weak: -1.1
+      sell-off: -1.8
+      slump: -1.7
+      
+    volatility:
+      volatile: -0.5
+      uncertainty: -0.8
+      risk: -0.6
+      concern: -0.7
+      crisis: -2.0
+
+monitoring:
+  # How often to fetch new news (minutes)
+  update_interval: 30
+  
+  # How far back to look for news (hours)
+  lookback_hours: 6
+  
+  # Markets to monitor
+  markets:
+    - "DAX"
+    - "FTSE"
+    - "EUR"
+    - "GBP"
+    - "SPX"
+    
+integration:
+  # How much weight to give sentiment vs technical signals
+  sentiment_weight: 0.3  # 30% sentiment, 70% technical
+  
+  # Minimum articles needed for sentiment signal
+  min_articles: 2
+  
+  # Enable/disable sentiment-based trading
+  enabled: true
+  
+  # Override technical signals with strong sentiment
+  override_technical: true
+  override_threshold: 1.2  # Very strong sentiment can override technical

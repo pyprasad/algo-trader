@@ -163,15 +163,48 @@ def get_available_markets():
                 markets.append(latest_tick["market"])
     return markets
 
-def can_open_new_trade(market: str) -> bool:
-    """Check if we can open a new trade for this market (no open positions)"""
+def cleanup_old_pending_trades(market: str = None, timeout_minutes: int = 5):
+    """Clean up PENDING trades older than timeout (likely failed/rejected)"""
+    from datetime import timedelta
+    cutoff_time = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+    
+    query = {
+        "status": "PENDING",
+        "timestamp": {"$lt": cutoff_time}
+    }
+    if market:
+        query["market"] = market
+    
+    result = trades_collection.update_many(
+        query,
+        {"$set": {"status": "TIMEOUT", "close_timestamp": datetime.utcnow()}}
+    )
+    
+    if result.modified_count > 0:
+        print(f"🧹 Cleaned up {result.modified_count} old PENDING trades (timeout: {timeout_minutes}min)")
+    
+    return result.modified_count
+
+def can_open_new_trade(market: str, max_pending: int = 2) -> bool:
+    """
+    Check if we can open a new trade for this market
+    - Only OPEN trades block new trades (confirmed positions)
+    - Allow limited PENDING trades (they may timeout/fail)
+    - Clean up old PENDING trades automatically
+    """
+    # First, clean up old pending trades
+    cleanup_old_pending_trades(market)
+    
+    # Only count OPEN trades as blocking (confirmed positions)
     open_trades = get_open_trades(market)
+    if len(open_trades) > 0:
+        print(f"⚠️ Cannot open new {market} trade: {len(open_trades)} confirmed open positions")
+        return False
+    
+    # Allow limited PENDING trades (they may fail/timeout)
     pending_trades = list(trades_collection.find({"market": market, "status": "PENDING"}))
-    
-    total_active = len(open_trades) + len(pending_trades)
-    
-    if total_active > 0:
-        print(f"⚠️ Cannot open new {market} trade: {len(open_trades)} open + {len(pending_trades)} pending positions")
+    if len(pending_trades) >= max_pending:
+        print(f"⚠️ Cannot open new {market} trade: {len(pending_trades)} pending trades (max: {max_pending})")
         return False
     
     return True
@@ -186,6 +219,7 @@ def get_trade_lifecycle_status(market: str = None):
     open_count = trades_collection.count_documents({**query, "status": "OPEN"})
     closed_count = trades_collection.count_documents({**query, "status": "CLOSED"})
     rejected_count = trades_collection.count_documents({**query, "status": "REJECTED"})
+    timeout_count = trades_collection.count_documents({**query, "status": "TIMEOUT"})
     
     return {
         "market": market or "ALL",
@@ -193,5 +227,7 @@ def get_trade_lifecycle_status(market: str = None):
         "open": open_count,
         "closed": closed_count,
         "rejected": rejected_count,
-        "total_active": pending_count + open_count
+        "timeout": timeout_count,
+        "total_active": open_count,  # Only count OPEN as truly active
+        "pending_unconfirmed": pending_count  # Separate count for pending
     }

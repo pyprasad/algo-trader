@@ -13,3 +13,5 @@ python-dotenv
 lightstreamer-client-lib==1.0.3
 pytz
 joblib
+textblob
+nltk
