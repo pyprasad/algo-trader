@@ -1,0 +1,12 @@
+active_markets:
+- FTSE 100
+- DAX
+risk_management:
+  emergency_stop_loss_percent: 10
+  max_exposure_per_market_percent: 20
+  max_margin_utilization_percent: 80
+system:
+  analysis_interval_seconds: 60
+  data_collection_timeout_seconds: 30
+  initial_balance: 10000.0
+  max_concurrent_markets: 5

@@ -3,6 +3,7 @@
 from pymongo import MongoClient
 from datetime import datetime
 import yaml
+import re
 
 # Load config
 with open("configs/global.yaml", "r") as f:
@@ -10,24 +11,47 @@ with open("configs/global.yaml", "r") as f:
 
 MONGO_URI = config["mongodb"]["uri"]
 DB_NAME = config["mongodb"]["database"]
-COLLECTION_NAME = config["mongodb"]["collection"]
 
 # Connect to MongoDB
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
-collection = db[COLLECTION_NAME]
 trades_collection = db["trades"]
+balance_collection = db["account_balance"]
+
+def sanitize_collection_name(market_name: str) -> str:
+    """Convert market name to valid MongoDB collection name"""
+    # Remove special characters and spaces, convert to lowercase
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', market_name.replace(' ', '_'))
+    sanitized = re.sub(r'_+', '_', sanitized).strip('_').lower()
+    return f"ticks_{sanitized}"
+
+def ensure_tick_collection_exists(market: str) -> str:
+    """Ensure collection exists for the market, create if not"""
+    collection_name = sanitize_collection_name(market)
+    
+    # Check if collection exists
+    if collection_name not in db.list_collection_names():
+        # Create collection with index on timestamp for efficient queries
+        tick_collection = db[collection_name]
+        tick_collection.create_index("timestamp")
+        tick_collection.create_index("market")
+        print(f"🆕 Created new collection: {collection_name} for market: {market}")
+    
+    return collection_name
 
 def log_tick(market: str, bid: float, offer: float):
-    """Insert tick data into MongoDB"""
+    """Insert tick data into market-specific MongoDB collection"""
+    collection_name = ensure_tick_collection_exists(market)
+    tick_collection = db[collection_name]
+    
     document = {
         "market": market,
         "bid": bid,
         "offer": offer,
         "timestamp": datetime.utcnow()
     }
-    collection.insert_one(document)
-    print(f"📥 Tick logged: {market} | Bid: {bid} | Offer: {offer}")
+    tick_collection.insert_one(document)
+    print(f"📥 Tick logged to {collection_name}: {market} | Bid: {bid} | Offer: {offer}")
 
 def log_trade(trade_data: dict):
     """Insert executed trade into MongoDB trades collection"""
@@ -72,3 +96,45 @@ def update_trade_status(trade_id, status: str, profit_loss: float = None):
     
     trades_collection.update_one({"_id": trade_id}, {"$set": update_data})
     print(f"📊 Trade {trade_id} updated: Status={status}, P/L={profit_loss}")
+
+def get_account_balance():
+    """Get current account balance from database"""
+    balance_doc = balance_collection.find_one({"type": "current"})
+    if balance_doc:
+        return balance_doc.get("balance", 0.0)
+    return 0.0
+
+def update_account_balance(balance: float):
+    """Update account balance in database"""
+    balance_collection.update_one(
+        {"type": "current"},
+        {"$set": {"balance": balance, "updated_at": datetime.utcnow()}},
+        upsert=True
+    )
+    print(f"💰 Account balance updated: £{balance}")
+
+def check_sufficient_balance(required_margin: float) -> bool:
+    """Check if account has sufficient balance for trade margin"""
+    current_balance = get_account_balance()
+    return current_balance >= required_margin
+
+def get_market_tick_data(market: str, limit: int = 100):
+    """Get recent tick data for specific market"""
+    collection_name = sanitize_collection_name(market)
+    if collection_name not in db.list_collection_names():
+        return []
+    
+    tick_collection = db[collection_name]
+    return list(tick_collection.find().sort("timestamp", -1).limit(limit))
+
+def get_available_markets():
+    """Get list of all markets with tick data"""
+    collections = db.list_collection_names()
+    markets = []
+    for col in collections:
+        if col.startswith("ticks_"):
+            # Get latest tick to extract market name
+            latest_tick = db[col].find_one(sort=[("timestamp", -1)])
+            if latest_tick and "market" in latest_tick:
+                markets.append(latest_tick["market"])
+    return markets

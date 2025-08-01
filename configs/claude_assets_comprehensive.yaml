@@ -1,3 +1,67 @@
+# configs/assets_comprehensive.yaml
+# Comprehensive asset configuration for multiple markets
+
+# === US STOCKS ===
+"META":
+  epic: "US500.OANDA"  # Adjust based on your broker
+  trade_size: 10
+  min_stop_distance: 0.1
+  currency: "USD"
+  market_hours:
+    open: "09:30"
+    close: "16:00"
+    timezone: "US/Eastern"
+  sector: "Technology"
+  volatility_factor: 1.5
+  
+"GOOGL":
+  epic: "GOOGL.NASDAQ"
+  trade_size: 5
+  min_stop_distance: 0.5
+  currency: "USD"
+  market_hours:
+    open: "09:30"
+    close: "16:00"
+    timezone: "US/Eastern"
+  sector: "Technology"
+  volatility_factor: 1.4
+
+"AAPL":
+  epic: "AAPL.NASDAQ"
+  trade_size: 15
+  min_stop_distance: 0.1
+  currency: "USD"
+  market_hours:
+    open: "09:30"
+    close: "16:00"
+    timezone: "US/Eastern"
+  sector: "Technology"
+  volatility_factor: 1.2
+
+"NVDA":
+  epic: "NVDA.NASDAQ"
+  trade_size: 8
+  min_stop_distance: 0.2
+  currency: "USD"
+  market_hours:
+    open: "09:30"
+    close: "16:00"
+    timezone: "US/Eastern"
+  sector: "Technology"
+  volatility_factor: 2.0
+
+"TSLA":
+  epic: "TSLA.NASDAQ"
+  trade_size: 6
+  min_stop_distance: 0.3
+  currency: "USD"
+  market_hours:
+    open: "09:30"
+    close: "16:00"
+    timezone: "US/Eastern"
+  sector: "Automotive"
+  volatility_factor: 2.5
+
 # === INDICES ===
 "FTSE 100":
   epic: "IX.D.FTSE.DAILY.IP"
@@ -46,67 +110,6 @@
     timezone: "Europe/Berlin"
   sector: "Index"
   volatility_factor: 1.2
-
-# === US STOCKS ===
-"AAPL":
-  epic: "AAPL.NASDAQ"
-  trade_size: 15
-  min_stop_distance: 0.1
-  currency: "USD"
-  market_hours:
-    open: "09:30"
-    close: "16:00"
-    timezone: "US/Eastern"
-  sector: "Technology"
-  volatility_factor: 1.2
-
-"GOOGL":
-  epic: "GOOGL.NASDAQ"
-  trade_size: 5
-  min_stop_distance: 0.5
-  currency: "USD"
-  market_hours:
-    open: "09:30"
-    close: "16:00"
-    timezone: "US/Eastern"
-  sector: "Technology"
-  volatility_factor: 1.4
-
-"META":
-  epic: "US500.OANDA"
-  trade_size: 10
-  min_stop_distance: 0.1
-  currency: "USD"
-  market_hours:
-    open: "09:30"
-    close: "16:00"
-    timezone: "US/Eastern"
-  sector: "Technology"
-  volatility_factor: 1.5
-
-"NVDA":
-  epic: "NVDA.NASDAQ"
-  trade_size: 8
-  min_stop_distance: 0.2
-  currency: "USD"
-  market_hours:
-    open: "09:30"
-    close: "16:00"
-    timezone: "US/Eastern"
-  sector: "Technology"
-  volatility_factor: 2.0
-
-"TSLA":
-  epic: "TSLA.NASDAQ"
-  trade_size: 6
-  min_stop_distance: 0.3
-  currency: "USD"
-  market_hours:
-    open: "09:30"
-    close: "16:00"
-    timezone: "US/Eastern"
-  sector: "Automotive"
-  volatility_factor: 2.5
 
 # === FOREX ===
 "EURUSD":

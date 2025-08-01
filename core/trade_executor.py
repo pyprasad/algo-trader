@@ -16,19 +16,15 @@ from utils.auth_helper import authenticate
 import sys, os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.config_loader import load_global_config, load_asset_config
-from data.db import log_trade
+from data.db import log_trade, check_sufficient_balance, get_account_balance, update_account_balance
 from datetime import datetime
 
 global_config = load_global_config()
-asset_config = load_asset_config("FTSE 100")
 
 API_KEY = global_config["ig"]["api_key"]
 BASE_URL = global_config["ig"]["base_url"]
 USERNAME = global_config["ig"]["username"]
 PASSWORD = global_config["ig"]["password"]
-
-MARKET_ID = asset_config["epic"]
-TRADE_SIZE = asset_config["trade_size"]
 
 
 # === Global Token Storage ===
@@ -61,26 +57,32 @@ def get_market_details(epic):
     }
 
 
-def place_trade(direction, stop_distance, limit_distance):
+def place_trade(market_name, direction, stop_distance, limit_distance):
     """
     Place a market trade with stop-loss and take-profit dynamically applied.
     """
+    # Load market-specific config
+    asset_config = load_asset_config(market_name)
+    market_id = asset_config["epic"]
+    trade_size = asset_config["trade_size"]
+    currency = asset_config.get("currency", "GBP")
+    
     url = f"{BASE_URL}/positions/otc"
     body = {
-        "epic": MARKET_ID,
+        "epic": market_id,
         "expiry": "DFB",
         "direction": direction,  # 'BUY' or 'SELL'
-        "size": TRADE_SIZE,
+        "size": trade_size,
         "orderType": "MARKET",
         "guaranteedStop": False,
         "forceOpen": True,
-        "currencyCode": "GBP",
+        "currencyCode": currency,
         "stopDistance": str(stop_distance),
         "limitDistance": str(limit_distance),
         "timeInForce": "FILL_OR_KILL"
     }
 
-    print(f"📤 Sending trade request: {direction} | SL: {stop_distance} | TP: {limit_distance}")
+    print(f"📤 Sending trade request for {market_name}: {direction} | SL: {stop_distance} | TP: {limit_distance}")
     response = requests.post(url, headers=HEADERS, json=body)
     response.raise_for_status()
     result = response.json()
@@ -103,38 +105,55 @@ def confirm_trade(deal_ref):
     return result
 
 
-def execute_trade(direction, strategy_sl=10, strategy_tp=20, strategy_signals=None):
+def execute_trade(market_name, direction, strategy_sl=10, strategy_tp=20, strategy_signals=None):
     """
-    Master function to place trade after validating market rules and log to MongoDB.
+    Master function to place trade after validating market rules, balance check, and log to MongoDB.
     """
     execution_start = datetime.utcnow()
     
-    print("🔎 Fetching market constraints...")
-    market_data = get_market_details(MARKET_ID)
+    # Load market-specific config
+    asset_config = load_asset_config(market_name)
+    trade_size = asset_config["trade_size"]
+    market_id = asset_config["epic"]
+    
+    print(f"🔎 Fetching market constraints for {market_name}...")
+    market_data = get_market_details(market_id)
 
     min_distance = market_data["minDistance"]
-    print(f"🛡️ Market min stop distance: {min_distance}")
+    margin_requirement = market_data["marginRequirement"]
+    
+    # Calculate required margin for this trade
+    required_margin = trade_size * margin_requirement
+    
+    print(f"🛡️ Market: {market_name} | Min distance: {min_distance} | Required margin: £{required_margin}")
+    
+    # GLOBAL BALANCE CHECK - Critical validation before any trade
+    if not check_sufficient_balance(required_margin):
+        current_balance = get_account_balance()
+        print(f"❌ INSUFFICIENT BALANCE: Current: £{current_balance} | Required: £{required_margin}")
+        return {"error": "Insufficient balance", "required": required_margin, "current": current_balance}
 
     # Adjust strategy SL/TP if below market minimum
     stop_distance = max(min_distance, strategy_sl)
     limit_distance = max(min_distance, strategy_tp)
 
-    deal_ref = place_trade(direction, stop_distance, limit_distance)
+    deal_ref = place_trade(market_name, direction, stop_distance, limit_distance)
     confirm = confirm_trade(deal_ref)
     
     # Log trade to MongoDB
     if confirm and confirm.get('dealStatus') in ['ACCEPTED', 'OPEN']:
         trade_data = {
-            "market": "FTSE 100",
+            "market": market_name,
             "direction": direction,
-            "size": TRADE_SIZE,
+            "size": trade_size,
             "entry_price": confirm.get('level', 0),
             "stop_loss": stop_distance,
             "take_profit": limit_distance,
             "deal_reference": deal_ref,
             "deal_status": confirm.get('dealStatus'),
             "execution_time": (datetime.utcnow() - execution_start).total_seconds(),
-            "profit_loss": confirm.get('profit', 0)
+            "profit_loss": confirm.get('profit', 0),
+            "margin_used": required_margin
         }
         
         # Include strategy signals if provided
@@ -142,5 +161,10 @@ def execute_trade(direction, strategy_sl=10, strategy_tp=20, strategy_signals=No
             trade_data.update(strategy_signals)
             
         log_trade(trade_data)
+        
+        # Update account balance after successful trade
+        current_balance = get_account_balance()
+        new_balance = current_balance - required_margin
+        update_account_balance(new_balance)
     
     return confirm

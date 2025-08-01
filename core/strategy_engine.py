@@ -6,7 +6,7 @@ from models.rsi import compute_rsi
 from models.atr import compute_atr
 from models.regime_model import detect_regime
 from core.signal_classifier import generate_trade_signal
-from data.db import collection as mongo_collection
+from data.db import db, sanitize_collection_name
 from models.ema import compute_ema
 import yaml
 import warnings
@@ -31,9 +31,17 @@ def run_strategy(asset="FTSE 100", lookback_minutes=60, timeframe='1min'):
     - Classifies trade signal
     """
 
-    # 1. Load recent tick data from MongoDB
+    # 1. Load recent tick data from market-specific MongoDB collection
     since = datetime.utcnow() - timedelta(minutes=lookback_minutes)
-    cursor = mongo_collection.find(
+    collection_name = sanitize_collection_name(asset)
+    
+    # Check if collection exists
+    if collection_name not in db.list_collection_names():
+        print(f"❌ No tick data found for {asset} (collection: {collection_name})")
+        return None
+    
+    tick_collection = db[collection_name]
+    cursor = tick_collection.find(
         {"market": asset, "timestamp": {"$gte": since}}
     ).sort("timestamp", 1)
 
@@ -95,3 +103,81 @@ def run_strategy(asset="FTSE 100", lookback_minutes=60, timeframe='1min'):
     }
 
     return signal, strategy_context
+
+
+class StrategyEngine:
+    """
+    Multi-market strategy engine for analyzing trading signals
+    """
+    
+    def __init__(self):
+        # Load strategy config
+        with open("configs/global.yaml", "r") as f:
+            config = yaml.safe_load(f)
+        
+        self.rsi_period = config["strategy"]["rsi_period"]
+        self.buy_threshold = config["strategy"]["rsi_buy_threshold"]
+        self.sell_threshold = config["strategy"]["rsi_sell_threshold"]
+        self.dynamic_atr_sltp = config["strategy"]["dynamic_atr_sltp"]
+    
+    def analyze_market_conditions(self, prices, market_name=None):
+        """
+        Analyze market conditions from a list of prices
+        
+        Args:
+            prices (list): List of prices (most recent last)
+            market_name (str): Optional market name for logging
+            
+        Returns:
+            dict: Strategy signals and indicators
+        """
+        if len(prices) < self.rsi_period + 5:
+            if market_name:
+                print(f"❌ {market_name}: Not enough price data for analysis ({len(prices)} prices)")
+            return None
+        
+        # Convert to pandas DataFrame
+        df = pd.DataFrame({'price': prices})
+        df.index = pd.date_range(end=datetime.utcnow(), periods=len(prices), freq='1min')
+        
+        # Compute indicators
+        df["rsi"] = compute_rsi(df["price"], period=self.rsi_period)
+        df["atr"] = compute_atr(df["price"]) if self.dynamic_atr_sltp else None
+        df["ema"] = compute_ema(df["price"], span=50)
+        
+        # Get latest values
+        latest = df.iloc[-1]
+        latest_price = latest["price"]
+        latest_ema = latest["ema"]
+        
+        # Determine trend
+        if latest_price > latest_ema:
+            trend = "uptrend"
+        elif latest_price < latest_ema:
+            trend = "downtrend"
+        else:
+            trend = "sideways"
+        
+        # Detect market regime
+        regime = detect_regime(df["price"])
+        
+        # Generate trade signal
+        signal = generate_trade_signal(
+            rsi=latest["rsi"],
+            atr=latest["atr"] if self.dynamic_atr_sltp else None,
+            regime=regime,
+            thresholds=(self.buy_threshold, self.sell_threshold),
+            trend=trend
+        )
+        
+        # Create strategy context
+        strategy_context = {
+            "rsi": float(latest["rsi"]) if pd.notna(latest["rsi"]) else None,
+            "atr": float(latest["atr"]) if self.dynamic_atr_sltp and pd.notna(latest["atr"]) else None,
+            "regime": regime,
+            "trend": trend,
+            "signal": signal,
+            "price": float(latest_price)
+        }
+        
+        return strategy_context
