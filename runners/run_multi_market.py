@@ -11,6 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from data.multi_market_collector import MultiMarketCollector
 from core.enhanced_strategy_engine import get_enhanced_strategy_engine
+from core.market_adaptive_strategy import get_market_adaptive_strategy
 from core.trade_executor import execute_trade
 from data.db import get_market_tick_data, get_available_markets, get_account_balance, get_trade_lifecycle_status
 from data.account_streamer import start_account_streaming, stop_account_streaming, get_live_account_data
@@ -42,6 +43,7 @@ class MultiMarketTradingSystem:
         self.markets = valid_markets
         self.collector = MultiMarketCollector(valid_markets)
         self.enhanced_strategy_engine = get_enhanced_strategy_engine()
+        self.market_adaptive_strategy = get_market_adaptive_strategy()
         self.running = False
         self.executor = ThreadPoolExecutor(max_workers=len(valid_markets) + 1)
         
@@ -87,8 +89,18 @@ class MultiMarketTradingSystem:
                 # Extract prices for analysis
                 prices = [tick['bid'] for tick in reversed(recent_ticks)]  # Reverse to get chronological order
                 
-                # Run enhanced strategy analysis with market name for ML/sentiment
-                signals = self.enhanced_strategy_engine.analyze_market_conditions(prices, market_name)
+                # Run market-adaptive strategy analysis (prioritized over enhanced strategy)
+                signals = self.market_adaptive_strategy.analyze_market_conditions(prices, market_name)
+                
+                # Fallback to enhanced strategy if adaptive strategy fails
+                if not signals or signals.get('signal') == 'HOLD':
+                    enhanced_signals = self.enhanced_strategy_engine.analyze_market_conditions(prices, market_name)
+                    if enhanced_signals and enhanced_signals.get('signal') != 'HOLD':
+                        # Merge adaptive constraints with enhanced signals
+                        if self.market_adaptive_strategy._is_good_trading_time(market_name) and \
+                           not self.market_adaptive_strategy._is_market_suspended(market_name):
+                            signals = enhanced_signals
+                            signals['strategy_source'] = 'enhanced_with_adaptive_filters'
                 
                 if signals:
                     # Enhanced strategy analysis results with more details
@@ -128,8 +140,11 @@ class MultiMarketTradingSystem:
                             
                             if 'error' in trade_result:
                                 print(f"❌ {market_name} Trade failed: {trade_result['error']}")
+                                # Record failed trade for adaptive strategy
+                                self.market_adaptive_strategy.record_trade_result(market_name, -5.0)  # Assume small loss for failed trades
                             else:
                                 print(f"✅ {market_name} Trade executed: {trade_result.get('dealStatus', 'Unknown')}")
+                                # Trade success will be recorded when streaming confirms P&L
                     else:
                         print(f"⏸️ {market_name} No trading signal - Holding position")
                 else:
@@ -345,6 +360,25 @@ if __name__ == "__main__":
                     print(f"🚀 Dynamic Limits: Managing {dpm_status['positions_managed']} positions | {adjustments} adjustments made")
                 elif dpm_status['enabled']:
                     print(f"⚠️ Dynamic Limits: Enabled but not running")
+                
+                # Show market-adaptive strategy status
+                try:
+                    market_status = trading_system.market_adaptive_strategy.get_market_status()
+                    status_parts = []
+                    for market, status in market_status.items():
+                        if status['suspended']:
+                            status_parts.append(f"{market}: 🚨SUSPENDED")
+                        elif status['consecutive_losses'] > 0:
+                            status_parts.append(f"{market}: ⚠️{status['consecutive_losses']}L")
+                        elif status['recent_performance'] > 0:
+                            status_parts.append(f"{market}: ✅+£{status['recent_performance']:.0f}")
+                        else:
+                            status_parts.append(f"{market}: ✅OK")
+                    
+                    if status_parts:
+                        print(f"🎯 Market Status: {' | '.join(status_parts)}")
+                except Exception:
+                    pass  # Don't show if not available
                     
             except Exception:
                 pass  # Don't show if not available
