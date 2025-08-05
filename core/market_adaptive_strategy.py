@@ -62,48 +62,139 @@ class MarketAdaptiveStrategy:
         
     def analyze_market_conditions(self, prices: List[float], market_name: str) -> Optional[Dict]:
         """
-        Analyze market conditions with market-specific approach
+        Analyze market conditions with market-specific approach and comprehensive error handling
         """
         try:
-            # Check if market is currently suspended
-            if self._is_market_suspended(market_name):
-                return {"signal": "HOLD", "reason": "Market suspended due to poor performance"}
+            # Input validation with detailed logging
+            if not prices:
+                print(f"❌ {market_name}: No price data provided")
+                return {"signal": "HOLD", "reason": "No price data available"}
             
-            # Check if current time is suitable for trading this market
-            if not self._is_good_trading_time(market_name):
-                return {"signal": "HOLD", "reason": "Outside preferred trading hours"}
+            if len(prices) < 10:
+                print(f"❌ {market_name}: Insufficient price data ({len(prices)} points)")
+                return {"signal": "HOLD", "reason": f"Insufficient data: {len(prices)} points"}
             
-            # Check volatility conditions
-            if not self._is_volatility_acceptable(prices, market_name):
-                return {"signal": "HOLD", "reason": "Volatility too high for safe trading"}
+            # Emergency fallback mode - simplified analysis when main system fails
+            emergency_mode = False
             
-            # Get market-specific strategy parameters
-            strategy_params = self._get_market_strategy_params(market_name)
-            
-            # Perform enhanced technical analysis
-            analysis = self._perform_technical_analysis(prices, market_name, strategy_params)
-            
-            if not analysis:
-                return {"signal": "HOLD", "reason": "Insufficient data for analysis"}
-            
-            # Apply multi-timeframe confirmation if required
-            if self._requires_timeframe_confirmation(market_name):
-                timeframe_signal = self._get_multi_timeframe_confirmation(market_name)
-                if not timeframe_signal:
-                    return {"signal": "HOLD", "reason": "Multi-timeframe signals not aligned"}
+            try:
+                # Check if market is currently suspended
+                if self._is_market_suspended(market_name):
+                    return {"signal": "HOLD", "reason": "Market suspended due to poor performance"}
                 
-                # Combine with single timeframe analysis
-                analysis["multi_timeframe_signal"] = timeframe_signal
-                analysis["confidence"] = min(analysis["confidence"] * 1.2, 1.0)  # Boost confidence
+                # Check if current time is suitable for trading this market
+                if not self._is_good_trading_time(market_name):
+                    return {"signal": "HOLD", "reason": "Outside preferred trading hours"}
+                
+                # Check volatility conditions
+                if not self._is_volatility_acceptable(prices, market_name):
+                    return {"signal": "HOLD", "reason": "Volatility too high for safe trading"}
+                
+            except Exception as filter_error:
+                print(f"⚠️ {market_name}: Filter checks failed: {filter_error}, entering emergency mode")
+                emergency_mode = True
+            
+            # Get market-specific strategy parameters with fallback
+            try:
+                strategy_params = self._get_market_strategy_params(market_name)
+            except Exception as param_error:
+                print(f"⚠️ {market_name}: Parameter loading failed: {param_error}, using defaults")
+                strategy_params = {
+                    "rsi_period": 14,
+                    "rsi_buy_threshold": 70,
+                    "rsi_sell_threshold": 30,
+                    "min_confidence_threshold": 0.7
+                }
+            
+            # Perform enhanced technical analysis with emergency fallback
+            analysis = None
+            if not emergency_mode:
+                try:
+                    analysis = self._perform_technical_analysis(prices, market_name, strategy_params)
+                except Exception as tech_error:
+                    print(f"❌ {market_name}: Technical analysis failed: {tech_error}, using emergency mode")
+                    emergency_mode = True
+            
+            # Emergency mode: Simple price-based analysis
+            if emergency_mode or not analysis:
+                print(f"🚨 {market_name}: Using emergency trading mode")
+                return self._emergency_analysis(prices, market_name)
+            
+            # Apply multi-timeframe confirmation if required (with error handling)
+            try:
+                if self._requires_timeframe_confirmation(market_name):
+                    timeframe_signal = self._get_multi_timeframe_confirmation(market_name)
+                    if not timeframe_signal:
+                        return {"signal": "HOLD", "reason": "Multi-timeframe signals not aligned"}
+                    
+                    # Combine with single timeframe analysis
+                    analysis["multi_timeframe_signal"] = timeframe_signal
+                    analysis["confidence"] = min(analysis.get("confidence", 0.5) * 1.2, 1.0)
+            except Exception as mtf_error:
+                print(f"⚠️ {market_name}: Multi-timeframe confirmation failed: {mtf_error}")
             
             # Apply final signal filtering
-            final_signal = self._apply_signal_filters(analysis, market_name, strategy_params)
+            try:
+                final_signal = self._apply_signal_filters(analysis, market_name, strategy_params)
+                return final_signal
+            except Exception as filter_error:
+                print(f"⚠️ {market_name}: Signal filtering failed: {filter_error}")
+                return {"signal": "HOLD", "reason": "Signal filtering failed"}
             
             return final_signal
             
         except Exception as e:
             print(f"❌ Error in market adaptive analysis for {market_name}: {e}")
             return {"signal": "HOLD", "reason": f"Analysis error: {e}"}
+    
+    def _emergency_analysis(self, prices: List[float], market_name: str) -> Dict:
+        """
+        Emergency fallback analysis using simple price-based logic when main system fails
+        """
+        try:
+            current_price = prices[-1]
+            
+            # Simple moving averages for trend detection
+            if len(prices) >= 20:
+                short_ma = sum(prices[-10:]) / 10
+                long_ma = sum(prices[-20:]) / 20
+            elif len(prices) >= 10:
+                short_ma = sum(prices[-5:]) / 5
+                long_ma = sum(prices[-10:]) / 10
+            else:
+                # Too little data for any meaningful analysis
+                return {"signal": "HOLD", "reason": "Emergency mode: insufficient data"}
+            
+            # Simple trend analysis
+            trend_up = short_ma > long_ma
+            recent_change = (current_price - prices[-5]) / prices[-5] * 100 if len(prices) >= 5 else 0
+            
+            # Conservative emergency signals
+            signal = "HOLD"
+            confidence = 0.3  # Low confidence in emergency mode
+            
+            # Only trade on strong signals in emergency mode
+            if trend_up and recent_change > 0.1:  # Strong upward momentum
+                signal = "BUY"
+                confidence = 0.4
+            elif not trend_up and recent_change < -0.1:  # Strong downward momentum
+                signal = "SELL"
+                confidence = 0.4
+            
+            return {
+                "signal": signal,
+                "confidence": confidence,
+                "rsi": 50,  # Neutral default
+                "atr": abs(current_price - prices[-2]) if len(prices) > 1 else 1.0,
+                "price": current_price,
+                "price_change": recent_change,
+                "emergency_mode": True,
+                "reason": f"Emergency analysis: trend_up={trend_up}, change={recent_change:.2f}%"
+            }
+            
+        except Exception as e:
+            print(f"❌ Emergency analysis failed for {market_name}: {e}")
+            return {"signal": "HOLD", "reason": "Emergency analysis failed"}
     
     def _get_market_strategy_params(self, market_name: str) -> Dict:
         """Get strategy parameters specific to the market"""
@@ -124,24 +215,57 @@ class MarketAdaptiveStrategy:
             }
     
     def _perform_technical_analysis(self, prices: List[float], market_name: str, params: Dict) -> Optional[Dict]:
-        """Perform technical analysis with market-specific parameters"""
+        """Perform technical analysis with market-specific parameters and robust error handling"""
         try:
-            if len(prices) < params.get("rsi_period", 14) + 5:
+            # Enhanced input validation
+            if not prices or len(prices) < 5:
+                print(f"⚠️ {market_name}: Insufficient price data ({len(prices) if prices else 0} points)")
+                return None
+                
+            min_required = params.get("rsi_period", 14) + 5
+            if len(prices) < min_required:
+                print(f"⚠️ {market_name}: Need {min_required} prices, got {len(prices)}")
                 return None
             
-            # Calculate technical indicators
+            # Validate price data quality
+            if any(p is None or not isinstance(p, (int, float)) or p <= 0 for p in prices[-20:]):
+                print(f"⚠️ {market_name}: Invalid price data detected")
+                return None
+            
+            # Calculate technical indicators with error handling
             import pandas as pd
-            price_series = pd.Series(prices)
-            rsi_series = compute_rsi(price_series, params["rsi_period"])
-            current_rsi = rsi_series.iloc[-1] if len(rsi_series) > 0 else 50
+            try:
+                price_series = pd.Series(prices)
+                
+                # RSI calculation with fallback
+                rsi_series = compute_rsi(price_series, params.get("rsi_period", 14))
+                if rsi_series is None or len(rsi_series) == 0:
+                    print(f"⚠️ {market_name}: RSI calculation failed")
+                    current_rsi = 50  # Neutral fallback
+                else:
+                    current_rsi = rsi_series.iloc[-1] if not pd.isna(rsi_series.iloc[-1]) else 50
+                
+                # ATR calculation with fallback
+                atr_series = compute_atr(price_series, 14)
+                if atr_series is None or len(atr_series) == 0:
+                    print(f"⚠️ {market_name}: ATR calculation failed")
+                    current_atr = abs(prices[-1] - prices[-2]) if len(prices) > 1 else 1.0  # Simple fallback
+                else:
+                    current_atr = atr_series.iloc[-1] if not pd.isna(atr_series.iloc[-1]) else 1.0
+                    
+            except Exception as indicator_error:
+                print(f"❌ {market_name}: Technical indicator calculation failed: {indicator_error}")
+                # Use simple fallbacks
+                current_rsi = 50
+                current_atr = abs(prices[-1] - prices[-2]) if len(prices) > 1 else 1.0
+                atr_series = pd.Series([current_atr])
             
-            # ATR for volatility assessment
-            atr_series = compute_atr(price_series, 14)
-            current_atr = atr_series.iloc[-1] if len(atr_series) > 0 else 0
-            
-            # Price analysis
-            current_price = prices[-1]
-            price_change = (current_price - prices[-2]) / prices[-2] * 100 if len(prices) > 1 else 0
+            # Price analysis with safety checks
+            current_price = float(prices[-1])
+            if len(prices) > 1 and prices[-2] != 0:
+                price_change = (current_price - prices[-2]) / prices[-2] * 100
+            else:
+                price_change = 0.0
             
             # Market-specific signal generation
             signal = "HOLD"
@@ -179,14 +303,24 @@ class MarketAdaptiveStrategy:
                 signal = "HOLD"
                 reason_parts.append(f"Confidence {confidence:.2f} < required {min_confidence}")
             
-            # Volatility adjustment for confidence
-            if current_atr > 0:
-                normal_atr = np.mean(atr_values[-20:]) if len(atr_values) >= 20 else current_atr
-                volatility_ratio = current_atr / normal_atr if normal_atr > 0 else 1.0
-                
-                if volatility_ratio > 1.5:  # High volatility
-                    confidence *= 0.8  # Reduce confidence
-                    reason_parts.append(f"High volatility ({volatility_ratio:.1f}x)")
+            # Volatility adjustment for confidence (fixed variable reference)
+            volatility_ratio = 1.0  # Default ratio
+            if current_atr > 0 and len(atr_series) > 0:
+                try:
+                    # Use correct variable name and add safety checks
+                    if len(atr_series) >= 20:
+                        normal_atr = np.mean(atr_series.iloc[-20:])
+                    else:
+                        normal_atr = atr_series.mean() if len(atr_series) > 0 else current_atr
+                    
+                    volatility_ratio = current_atr / normal_atr if normal_atr > 0 else 1.0
+                    
+                    if volatility_ratio > 1.5:  # High volatility
+                        confidence *= 0.8  # Reduce confidence
+                        reason_parts.append(f"High volatility ({volatility_ratio:.1f}x)")
+                except Exception as vol_e:
+                    print(f"⚠️ Volatility calculation error for {market_name}: {vol_e}")
+                    volatility_ratio = 1.0  # Safe fallback
             
             return {
                 "signal": signal,
@@ -363,7 +497,7 @@ class MarketAdaptiveStrategy:
         return analysis
     
     def _get_recent_market_performance(self, market_name: str) -> float:
-        """Get recent P&L performance for a market"""
+        """Get recent P&L performance for a market with robust null handling"""
         try:
             # Get recent trades from last 24 hours
             yesterday = datetime.utcnow() - timedelta(days=1)
@@ -376,11 +510,42 @@ class MarketAdaptiveStrategy:
             if not recent_trades:
                 return 0.0
             
-            total_pnl = sum(trade.get("profit_loss", 0) for trade in recent_trades)
+            # Robust null-safe calculation of total P&L
+            total_pnl = 0.0
+            valid_trades = 0
+            corrupted_trades = 0
+            
+            for trade in recent_trades:
+                pnl_value = trade.get("profit_loss")
+                
+                # Handle various null/invalid cases
+                if pnl_value is None:
+                    corrupted_trades += 1
+                    continue  # Skip None values
+                elif isinstance(pnl_value, (int, float)):
+                    total_pnl += float(pnl_value)
+                    valid_trades += 1
+                elif isinstance(pnl_value, str):
+                    try:
+                        # Try to convert string to float (in case it's "10.5" etc.)
+                        total_pnl += float(pnl_value)
+                        valid_trades += 1
+                    except (ValueError, TypeError):
+                        corrupted_trades += 1
+                        continue
+                else:
+                    corrupted_trades += 1
+                    continue
+            
+            # Log data quality issues
+            if corrupted_trades > 0:
+                print(f"⚠️ {market_name}: Found {corrupted_trades} corrupted trade records, using {valid_trades} valid trades")
+            
             return total_pnl
             
         except Exception as e:
             print(f"❌ Error getting recent performance for {market_name}: {e}")
+            # Return 0.0 as safe fallback
             return 0.0
     
     def record_trade_result(self, market_name: str, pnl: float):
