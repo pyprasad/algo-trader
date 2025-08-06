@@ -88,7 +88,10 @@ class AccountBalanceStreamer:
                         available_cash = update.getValue("AVAILABLE_CASH")
                         pnl = update.getValue("PNL")
                         margin = update.getValue("MARGIN")
+                        margin_lr = update.getValue("MARGIN_LR")
+                        margin_nlr = update.getValue("MARGIN_NLR")
                         equity = update.getValue("EQUITY")
+                        equity_used = update.getValue("EQUITY_USED")
                         funds = update.getValue("FUNDS")
                         available_to_deal = update.getValue("AVAILABLE_TO_DEAL")
                         
@@ -99,8 +102,14 @@ class AccountBalanceStreamer:
                             self.streamer.account_data['pnl'] = float(pnl)
                         if margin:
                             self.streamer.account_data['margin'] = float(margin)
+                        if margin_lr:
+                            self.streamer.account_data['margin_lr'] = float(margin_lr)
+                        if margin_nlr:
+                            self.streamer.account_data['margin_nlr'] = float(margin_nlr)
                         if equity:
                             self.streamer.account_data['equity'] = float(equity)
+                        if equity_used:
+                            self.streamer.account_data['equity_used'] = float(equity_used)
                         if funds:
                             self.streamer.account_data['funds'] = float(funds)
                         if available_to_deal:
@@ -123,6 +132,9 @@ class AccountBalanceStreamer:
                         print(f"   P&L: £{self.streamer.account_data.get('pnl', 0):.2f}")
                         print(f"   Margin Used: £{self.streamer.account_data.get('margin', 0):.2f}")
                         print(f"   Equity: £{self.streamer.account_data.get('equity', 0):.2f}")
+                        
+                        # Check for margin alerts
+                        self.streamer.check_margin_alerts()
                         
                     except ValueError as e:
                         print(f"❌ Error processing account update: {e}")
@@ -202,6 +214,55 @@ class AccountBalanceStreamer:
         if total_available > 0:
             return (margin_used / total_available) * 100
         return 0.0
+    
+    def check_margin_alerts(self):
+        """Check for margin-related alerts and warnings"""
+        utilization = self.get_margin_utilization()
+        alerts = []
+        
+        # Define thresholds
+        WARNING_THRESHOLD = 70.0
+        HIGH_THRESHOLD = 80.0
+        CRITICAL_THRESHOLD = 85.0
+        
+        if utilization >= CRITICAL_THRESHOLD:
+            alerts.append({
+                "level": "CRITICAL",
+                "message": f"Margin utilization CRITICAL: {utilization:.1f}%",
+                "action": "Close positions immediately"
+            })
+            print(f"🚨 CRITICAL: Margin utilization at {utilization:.1f}% - CLOSE POSITIONS NOW!")
+        elif utilization >= HIGH_THRESHOLD:
+            alerts.append({
+                "level": "HIGH",
+                "message": f"Margin utilization HIGH: {utilization:.1f}%",
+                "action": "No new positions allowed"
+            })
+            print(f"⚠️ HIGH: Margin utilization at {utilization:.1f}% - No new trades!")
+        elif utilization >= WARNING_THRESHOLD:
+            alerts.append({
+                "level": "WARNING",
+                "message": f"Margin utilization WARNING: {utilization:.1f}%",
+                "action": "Reduce position sizes"
+            })
+            print(f"⚠️ WARNING: Margin utilization at {utilization:.1f}% - Trade carefully!")
+        
+        return alerts
+    
+    def get_detailed_margin_info(self):
+        """Get detailed margin information"""
+        return {
+            "margin_total": self.account_data.get('margin', 0.0),
+            "margin_lr": self.account_data.get('margin_lr', 0.0),  # Limited Risk
+            "margin_nlr": self.account_data.get('margin_nlr', 0.0),  # Non-Limited Risk
+            "available_cash": self.account_data.get('available_cash', 0.0),
+            "available_to_deal": self.account_data.get('available_to_deal', 0.0),
+            "equity": self.account_data.get('equity', 0.0),
+            "equity_used": self.account_data.get('equity_used', 0.0),
+            "utilization_percent": self.get_margin_utilization(),
+            "alerts": self.check_margin_alerts(),
+            "last_update": self.account_data.get('last_update')
+        }
 
 
 # Global account streamer instance

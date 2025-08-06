@@ -87,7 +87,12 @@ class MLTradingPredictor:
         - DataFrame with engineered features
         """
         
-        price_col = "midprice" if "midprice" in df.columns else "close"
+        # Clean DataFrame - keep only numeric columns for feature creation
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        if len(numeric_cols) == 0:
+            raise ValueError("No numeric columns found for feature creation")
+        
+        price_col = "midprice" if "midprice" in numeric_cols else numeric_cols[0]
         price_series = df[price_col]
         
         features = pd.DataFrame(index=df.index)
@@ -419,12 +424,17 @@ class MLEnsemblePredictor:
         
     def prepare_enhanced_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create comprehensive feature set"""
+        # Clean DataFrame - remove any non-numeric columns like ObjectId
+        df_clean = df.copy()
+        if '_id' in df_clean.columns:
+            df_clean = df_clean.drop('_id', axis=1)
+        
         # Start with existing features
         predictor = MLTradingPredictor()
-        features = predictor.create_features(df)
+        features = predictor.create_features(df_clean)
         
         # Add enhanced features
-        enhanced_df = df.copy()
+        enhanced_df = df_clean.copy()
         enhanced_df = EnhancedFeatureEngineer.create_regime_features(enhanced_df)
         enhanced_df = EnhancedFeatureEngineer.create_pattern_features(enhanced_df)
         
@@ -454,9 +464,16 @@ class MLEnsemblePredictor:
         if len(ticks) < 1000:
             return {"error": f"Insufficient data: {len(ticks)} < 1000"}
         
-        # Convert to DataFrame
+        # Convert to DataFrame (exclude MongoDB _id field)
         df = pd.DataFrame(ticks)
+        # Remove MongoDB ObjectId field if present
+        if '_id' in df.columns:
+            df = df.drop('_id', axis=1)
         df['timestamp'] = pd.to_datetime(df['timestamp'])
+        
+        # Remove duplicate timestamps before setting index
+        df = df.drop_duplicates(subset=['timestamp'], keep='last')
+        
         df = df.set_index('timestamp')
         df['midprice'] = (df['bid'] + df['offer']) / 2
         
@@ -471,6 +488,17 @@ class MLEnsemblePredictor:
         labels[future_returns < -0.3] = 2  # SELL
         
         # Align features and labels
+        common_index = features.index.intersection(labels.index)
+        features = features.loc[common_index]
+        labels = labels.loc[common_index]
+        
+        # Remove duplicate indices if any
+        if features.index.duplicated().any():
+            features = features[~features.index.duplicated(keep='last')]
+        if labels.index.duplicated().any():
+            labels = labels[~labels.index.duplicated(keep='last')]
+        
+        # Re-align after deduplication
         common_index = features.index.intersection(labels.index)
         features = features.loc[common_index]
         labels = labels.loc[common_index]

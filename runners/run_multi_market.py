@@ -90,7 +90,14 @@ class MultiMarketTradingSystem:
                 prices = [tick['bid'] for tick in reversed(recent_ticks)]  # Reverse to get chronological order
                 
                 # Run market-adaptive strategy analysis (prioritized over enhanced strategy)
+                print(f"🔍 {market_name}: Analyzing {len(prices)} price points...")
                 signals = self.market_adaptive_strategy.analyze_market_conditions(prices, market_name)
+                
+                # Log signal result
+                if signals:
+                    print(f"📊 {market_name}: Adaptive Strategy Signal = {signals.get('signal', 'NONE')}, Confidence = {signals.get('confidence', 0):.2f}")
+                else:
+                    print(f"⚠️ {market_name}: No signals from adaptive strategy")
                 
                 # Fallback to enhanced strategy if adaptive strategy fails
                 if not signals or signals.get('signal') == 'HOLD':

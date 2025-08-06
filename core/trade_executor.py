@@ -18,6 +18,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.config_loader import load_global_config, load_asset_config
 from data.db import log_trade, check_sufficient_balance, get_account_balance, update_account_balance, can_open_new_trade, get_trade_lifecycle_status
 from datetime import datetime
+from utils.after_hours_manager import get_after_hours_manager
+from core.margin_calculator import get_margin_calculator
 
 global_config = load_global_config()
 
@@ -108,6 +110,7 @@ def confirm_trade(deal_ref):
 def execute_trade(market_name, direction, strategy_sl=10, strategy_tp=20, strategy_signals=None):
     """
     Master function to place trade after validating market rules, balance check, and log to MongoDB.
+    Now includes after-hours trading support with dynamic margin and position sizing.
     """
     execution_start = datetime.utcnow()
     
@@ -119,19 +122,67 @@ def execute_trade(market_name, direction, strategy_sl=10, strategy_tp=20, strate
     
     # Load market-specific config
     asset_config = load_asset_config(market_name)
-    trade_size = asset_config["trade_size"]
+    base_trade_size = asset_config["trade_size"]
     market_id = asset_config["epic"]
+    
+    # Get after-hours manager and margin calculator
+    after_hours_mgr = get_after_hours_manager()
+    margin_calc = get_margin_calculator()
+    
+    # Check market session and get trading parameters
+    trading_params = after_hours_mgr.get_session_parameters(market_name, market_id)
+    session = trading_params["session"]
+    
+    print(f"🕐 Market Session: {session} | Is Tradeable: {trading_params['is_tradeable']}")
+    
+    # Check if market is open for trading
+    if not trading_params["is_tradeable"]:
+        print(f"❌ TRADE BLOCKED: {market_name} is not tradeable in {session} session")
+        return {"error": f"Market not tradeable in {session} session", "session": session}
+    
+    # Use appropriate EPIC for weekend trading
+    effective_epic = trading_params["effective_epic"]
+    if effective_epic != market_id:
+        print(f"🔄 Using weekend EPIC: {effective_epic}")
+        market_id = effective_epic
+    
+    # Calculate position size based on session
+    position_multiplier = after_hours_mgr.get_position_size_multiplier(session)
+    trade_size = base_trade_size * position_multiplier
+    
+    print(f"📏 Position Sizing: Base={base_trade_size}, Multiplier={position_multiplier:.1f}, Final={trade_size}")
     
     print(f"🔎 Fetching market constraints for {market_name}...")
     market_data = get_market_details(market_id)
 
     min_distance = market_data["minDistance"]
-    margin_requirement = market_data["marginRequirement"]
+    base_margin_requirement = market_data["marginRequirement"]
+    
+    # Apply after-hours margin multiplier
+    margin_multiplier = trading_params["margin_multiplier"]
+    adjusted_margin_requirement = base_margin_requirement * margin_multiplier
     
     # Calculate required margin for this trade
-    required_margin = trade_size * margin_requirement
+    required_margin = trade_size * adjusted_margin_requirement
     
-    print(f"🛡️ Market: {market_name} | Min distance: {min_distance} | Required margin: £{required_margin}")
+    print(f"🛡️ Market: {market_name} | Session: {session}")
+    print(f"   Base margin: £{base_margin_requirement:.2f} | Multiplier: {margin_multiplier}x")
+    print(f"   Adjusted margin: £{adjusted_margin_requirement:.2f}")
+    print(f"   Total required: £{required_margin:.2f}")
+    
+    # Validate margin requirements using margin calculator
+    can_trade, validation = margin_calc.validate_trade_margin(market_name, trade_size, market_id)
+    
+    if not can_trade:
+        print(f"❌ MARGIN VALIDATION FAILED:")
+        for reason in validation["reasons"]:
+            print(f"   • {reason}")
+        return {
+            "error": "Margin validation failed", 
+            "reasons": validation["reasons"],
+            "margin_status": validation["margin_status"],
+            "current_utilization": validation["current_utilization"]
+        }
     
     # GLOBAL BALANCE CHECK - Critical validation before any trade
     if not check_sufficient_balance(required_margin):
@@ -139,9 +190,17 @@ def execute_trade(market_name, direction, strategy_sl=10, strategy_tp=20, strate
         print(f"❌ INSUFFICIENT BALANCE: Current: £{current_balance} | Required: £{required_margin}")
         return {"error": "Insufficient balance", "required": required_margin, "current": current_balance}
 
-    # Adjust strategy SL/TP if below market minimum
-    stop_distance = max(min_distance, strategy_sl)
-    limit_distance = max(min_distance, strategy_tp)
+    # Adjust stops/limits for session (wider during after-hours)
+    adjusted_sl, adjusted_tp = after_hours_mgr.calculate_adjusted_stops(strategy_sl, strategy_tp, session)
+    
+    # Ensure minimum distance requirements
+    stop_distance = max(min_distance, adjusted_sl)
+    limit_distance = max(min_distance, adjusted_tp)
+    
+    print(f"📐 Stop/Limit Adjustment:")
+    print(f"   Original: SL={strategy_sl}, TP={strategy_tp}")
+    print(f"   Adjusted: SL={adjusted_sl:.1f}, TP={adjusted_tp:.1f}")
+    print(f"   Final: SL={stop_distance:.1f}, TP={limit_distance:.1f}")
 
     deal_ref = place_trade(market_name, direction, stop_distance, limit_distance)
     confirm = confirm_trade(deal_ref)
@@ -159,7 +218,12 @@ def execute_trade(market_name, direction, strategy_sl=10, strategy_tp=20, strate
             "deal_status": confirm.get('dealStatus'),
             "execution_time": (datetime.utcnow() - execution_start).total_seconds(),
             "profit_loss": confirm.get('profit', 0),
-            "margin_used": required_margin
+            "margin_used": required_margin,
+            "session": session,
+            "is_after_hours": session in ["pre_market", "after_hours", "weekend"],
+            "position_multiplier": position_multiplier,
+            "margin_multiplier": margin_multiplier,
+            "effective_epic": market_id
         }
         
         # Include strategy signals if provided

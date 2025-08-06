@@ -1,0 +1,141 @@
+# After-Hours Trading Configuration
+# Controls extended trading hours, margin adjustments, and risk parameters
+
+after_hours_trading:
+  # Global enable/disable for after-hours trading
+  enabled: true
+  
+  # Market-specific configurations
+  markets:
+    "FTSE 100":
+      extended_hours_enabled: false  # FTSE doesn't have extended hours
+      weekend_trading:
+        enabled: true
+        epic: "IX.D.FTSE.WEEKEND.IP"
+        margin_multiplier: 2.0
+        position_size_multiplier: 0.5
+      
+    "S&P 500":
+      extended_hours_enabled: true
+      pre_market:
+        start: "04:00"
+        end: "09:30"
+        timezone: "US/Eastern"
+        margin_multiplier: 1.5
+        position_size_multiplier: 0.5
+      after_hours:
+        start: "16:00"
+        end: "20:00"
+        timezone: "US/Eastern"
+        margin_multiplier: 1.5
+        position_size_multiplier: 0.5
+      weekend_trading:
+        enabled: true
+        epic: "IX.D.SPTRD.WEEKEND.IP"
+        margin_multiplier: 2.0
+        position_size_multiplier: 0.3
+    
+    "NASDAQ 100":
+      extended_hours_enabled: true
+      pre_market:
+        start: "04:00"
+        end: "09:30"
+        timezone: "US/Eastern"
+        margin_multiplier: 1.5
+        position_size_multiplier: 0.5
+      after_hours:
+        start: "16:00"
+        end: "20:00"
+        timezone: "US/Eastern"
+        margin_multiplier: 1.5
+        position_size_multiplier: 0.5
+      weekend_trading:
+        enabled: true
+        epic: "IX.D.NASDAQ.WEEKEND.IP"
+        margin_multiplier: 2.0
+        position_size_multiplier: 0.3
+    
+    "DAX":
+      extended_hours_enabled: true
+      pre_market:
+        start: "07:00"
+        end: "08:00"
+        timezone: "Europe/Berlin"
+        margin_multiplier: 1.5
+        position_size_multiplier: 0.5
+      after_hours:
+        start: "16:30"
+        end: "22:00"
+        timezone: "Europe/Berlin"
+        margin_multiplier: 1.5
+        position_size_multiplier: 0.5
+      weekend_trading:
+        enabled: true
+        epic: "IX.D.DAX.WEEKEND.IP"
+        margin_multiplier: 2.0
+        position_size_multiplier: 0.3
+
+  # Global risk management settings
+  risk_management:
+    # Maximum margin utilization percentages
+    regular_hours_max_margin: 80  # 80% during regular hours
+    extended_hours_max_margin: 60  # 60% during extended hours
+    weekend_max_margin: 50  # 50% during weekends
+    
+    # Position limits
+    max_positions_regular: 5
+    max_positions_extended: 3
+    max_positions_weekend: 2
+    
+    # Per-market exposure limits (% of total capital)
+    max_exposure_regular: 20
+    max_exposure_extended: 10
+    max_exposure_weekend: 5
+    
+    # Emergency thresholds
+    margin_warning_threshold: 70  # Warning at 70% utilization
+    margin_critical_threshold: 85  # Emergency close at 85%
+    
+    # Loss limits
+    daily_loss_limit_regular: 500  # £500 max daily loss regular hours
+    daily_loss_limit_extended: 250  # £250 max daily loss extended hours
+    daily_loss_limit_weekend: 150  # £150 max daily loss weekend
+    
+  # Spread adjustments
+  spread_adjustments:
+    regular_multiplier: 1.0
+    pre_market_multiplier: 2.0
+    after_hours_multiplier: 2.0
+    weekend_multiplier: 3.0
+    
+  # Stop-loss and take-profit adjustments
+  stop_loss_adjustments:
+    regular_multiplier: 1.0
+    extended_multiplier: 1.5  # Wider stops during extended hours
+    weekend_multiplier: 2.0  # Even wider for weekends
+    
+  # Signal confidence thresholds
+  signal_thresholds:
+    regular_min_confidence: 0.6
+    extended_min_confidence: 0.75  # Higher confidence required
+    weekend_min_confidence: 0.8  # Highest confidence for weekends
+    
+  # Trading session priorities
+  session_priorities:
+    - "regular"  # Prefer regular hours
+    - "after_hours"  # Then after-hours
+    - "pre_market"  # Then pre-market
+    - "weekend"  # Weekend as last resort
+    
+  # Monitoring and alerts
+  monitoring:
+    check_interval_seconds: 30
+    alert_on_high_margin: true
+    alert_on_wide_spreads: true
+    log_all_after_hours_trades: true
+    
+  # Performance tracking
+  performance_tracking:
+    track_by_session: true
+    compare_sessions: true
+    report_frequency: "daily"
