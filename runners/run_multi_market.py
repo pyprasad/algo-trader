@@ -19,6 +19,7 @@ from data.trade_streamer import start_trade_streaming, stop_trade_streaming, get
 from utils.market_config_loader import MarketConfigLoader
 from utils.trading_safety import get_trading_safety_manager
 from core.dynamic_position_manager import get_dynamic_position_manager
+from data.news_sentiment import get_sentiment_engine
 
 class MultiMarketTradingSystem:
     def __init__(self, config_loader: MarketConfigLoader = None):
@@ -65,6 +66,10 @@ class MultiMarketTradingSystem:
         # Initialize dynamic position manager
         self.dynamic_position_manager = get_dynamic_position_manager()
         print("🚀 Dynamic position manager initialized")
+        
+        # Initialize sentiment analysis engine
+        self.sentiment_engine = get_sentiment_engine()
+        print("📰 News sentiment analysis engine initialized")
         
     def start_data_collection(self):
         """Start collecting tick data for all markets"""
@@ -226,6 +231,14 @@ class MultiMarketTradingSystem:
         if self.dynamic_position_manager.start():
             print("🚀 Dynamic position management active")
         
+        # Start sentiment analysis
+        print("📰 Starting news sentiment analysis...")
+        try:
+            self.sentiment_engine.start_continuous_monitoring(self.markets)
+            print("✅ News sentiment analysis started")
+        except Exception as e:
+            print(f"⚠️ Sentiment analysis failed to start: {e}")
+        
         print("✅ Multi-market trading system is running!")
         
     def stop_trading(self):
@@ -248,6 +261,13 @@ class MultiMarketTradingSystem:
             
         # Stop dynamic position management
         self.dynamic_position_manager.stop()
+        
+        # Stop sentiment analysis
+        try:
+            self.sentiment_engine.stop_monitoring()
+            print("📰 News sentiment analysis stopped")
+        except Exception as e:
+            print(f"⚠️ Error stopping sentiment analysis: {e}")
         
         # Shutdown thread executor
         self.executor.shutdown(wait=True)

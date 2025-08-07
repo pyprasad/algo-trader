@@ -41,3 +41,29 @@ dynamic_limits:
     rapid_check_duration: 300  # Duration of rapid checking (5 minutes)
     emergency_stop_multiplier: 0.7  # Tighten stop loss to 70% of original
     adverse_signal_close: true  # Close if signal flips opposite immediately
+
+# 📰 News Sentiment Analysis Configuration
+sentiment_analysis:
+  enabled: true
+  check_interval_minutes: 60  # Check every hour (configurable)
+  respect_market_hours: true  # Only run during market hours + buffer
+  markets: ["DAX", "FTSE"]  # Markets to analyze
+  min_confidence_threshold: 0.6  # Minimum confidence to use sentiment signals
+  
+  # API Configuration
+  api_sources:
+    newsapi:
+      enabled: true
+      key: "b784c918f7864e06b203f9dece8f09af"
+    alpha_vantage:
+      enabled: true
+      key: "WB87DUF9M5MPKMTM"
+    polygon:
+      enabled: true
+      key: "sY7ZjaLRvgKKItf2daISi6TDfXeaWuPw"
+  
+  # Market Hours Configuration (London time)
+  market_hours:
+    start_hour: 7   # 1 hour before FTSE opens
+    end_hour: 18    # 30 minutes after DAX closes
+    skip_weekends: true

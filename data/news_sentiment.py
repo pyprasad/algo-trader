@@ -41,21 +41,24 @@ class NewsSourceManager:
     """Manages multiple news sources and API calls"""
     
     def __init__(self):
+        # Load API configuration from global config
+        api_config = config.get("sentiment_analysis", {}).get("api_sources", {})
+        
         self.sources = {
             "newsapi": {
                 "url": "https://newsapi.org/v2/everything",
-                "key": "YOUR_NEWSAPI_KEY",  # Get from newsapi.org
-                "enabled": False  # Enable after getting API key
+                "key": api_config.get("newsapi", {}).get("key", ""),
+                "enabled": api_config.get("newsapi", {}).get("enabled", False)
             },
             "alpha_vantage": {
                 "url": "https://www.alphavantage.co/query",
-                "key": "YOUR_ALPHA_VANTAGE_KEY",  # Get from alphavantage.co
-                "enabled": False  # Enable after getting API key
+                "key": api_config.get("alpha_vantage", {}).get("key", ""),
+                "enabled": api_config.get("alpha_vantage", {}).get("enabled", False)
             },
             "polygon": {
                 "url": "https://api.polygon.io/v2/reference/news",
-                "key": "YOUR_POLYGON_KEY",  # Get from polygon.io
-                "enabled": False  # Enable after getting API key
+                "key": api_config.get("polygon", {}).get("key", ""),
+                "enabled": api_config.get("polygon", {}).get("enabled", False)
             }
         }
         
@@ -386,15 +389,26 @@ class NewsSentimentEngine:
             "recommendation": f"Sentiment suggests {signal} with {signal_strength:.1f} strength" if signal != "HOLD" else "Neutral sentiment - no clear direction"
         }
     
-    def start_continuous_monitoring(self, markets: List[str], interval_minutes: int = 30):
-        """Start continuous news monitoring in background"""
+    def start_continuous_monitoring(self, markets: List[str], interval_minutes: int = None):
+        """Start continuous news monitoring in background with configurable intervals and market hours respect"""
+        
+        # Load interval from config or use default
+        if interval_minutes is None:
+            sentiment_config = config.get("sentiment_analysis", {})
+            interval_minutes = sentiment_config.get("check_interval_minutes", 60)  # Default to hourly
+        
         self.running = True
         
         def monitor_loop():
             while self.running:
                 try:
-                    print(f"🔄 Running sentiment analysis cycle...")
-                    self.fetch_and_analyze_news(markets)
+                    # Check if we should run during current time
+                    if self._should_run_sentiment_analysis(markets):
+                        print(f"🔄 Running sentiment analysis cycle...")
+                        self.fetch_and_analyze_news(markets)
+                    else:
+                        print(f"📴 Skipping sentiment analysis - markets closed")
+                    
                     print(f"⏳ Waiting {interval_minutes} minutes for next cycle...")
                     time.sleep(interval_minutes * 60)
                 except Exception as e:
@@ -403,7 +417,49 @@ class NewsSentimentEngine:
         
         monitor_thread = threading.Thread(target=monitor_loop, daemon=True)
         monitor_thread.start()
-        print(f"🚀 Started continuous sentiment monitoring for {markets}")
+        print(f"🚀 Started continuous sentiment monitoring for {markets} (every {interval_minutes} minutes)")
+    
+    def _should_run_sentiment_analysis(self, markets: List[str] = None) -> bool:
+        """Check if sentiment analysis should run based on market hours"""
+        from datetime import datetime
+        import pytz
+        
+        try:
+            # Load sentiment configuration
+            sentiment_config = config.get("sentiment_analysis", {})
+            if not sentiment_config.get("enabled", True):
+                return False
+            
+            if not sentiment_config.get("respect_market_hours", True):
+                return True  # Always run if market hours not respected
+                
+            # Get current time in different timezones
+            utc_now = datetime.now(pytz.UTC)
+            london_tz = pytz.timezone('Europe/London')
+            london_time = utc_now.astimezone(london_tz)
+            
+            current_hour = london_time.hour
+            current_weekday = london_time.weekday()  # 0 = Monday, 6 = Sunday
+            
+            # Skip weekends if configured
+            market_hours_config = sentiment_config.get("market_hours", {})
+            if market_hours_config.get("skip_weekends", True) and current_weekday >= 5:
+                return False
+            
+            # Get market hours from config
+            market_start_hour = market_hours_config.get("start_hour", 7)
+            market_end_hour = market_hours_config.get("end_hour", 18)
+            
+            # Only run sentiment analysis during or near market hours
+            if market_start_hour <= current_hour <= market_end_hour:
+                return True
+                
+            return False
+            
+        except Exception as e:
+            print(f"⚠️ Error checking market hours: {e}")
+            # Default to running if we can't determine market hours
+            return True
     
     def stop_monitoring(self):
         """Stop continuous monitoring"""
