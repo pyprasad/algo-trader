@@ -209,6 +209,96 @@ def can_open_new_trade(market: str, max_pending: int = 2) -> bool:
     
     return True
 
+def sync_trade_statuses_with_ig():
+    """
+    Synchronize database trade statuses with IG API reality.
+    This function prevents corrupted trade records by checking if trades
+    marked as OPEN in DB are actually closed in IG.
+    """
+    try:
+        from utils.auth_helper import authenticate
+        from utils.config_loader import load_global_config
+        import requests
+        
+        config = load_global_config()
+        
+        # Get IG API credentials
+        cst, xst, _, _ = authenticate()
+        headers = {
+            "X-IG-API-KEY": config["ig"]["api_key"],
+            "CST": cst,
+            "X-SECURITY-TOKEN": xst,
+            "Content-Type": "application/json"
+        }
+        base_url = config["ig"]["base_url"]
+        
+        # Get all open trades from database
+        open_trades = list(trades_collection.find({"status": "OPEN"}))
+        if not open_trades:
+            print("📊 No open trades in database to sync")
+            return {"synced": 0, "closed": 0, "errors": 0}
+        
+        print(f"🔄 Syncing {len(open_trades)} open trades with IG API...")
+        
+        # Get all positions from IG
+        url = f"{base_url}/positions"
+        response = requests.get(url, headers=headers, timeout=15)
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to get IG positions: {response.status_code}")
+            return {"synced": 0, "closed": 0, "errors": 1}
+        
+        ig_positions = response.json().get("positions", [])
+        ig_deal_references = {
+            pos.get("position", {}).get("dealReference") 
+            for pos in ig_positions 
+            if pos.get("position", {}).get("dealReference")
+        }
+        
+        synced_count = 0
+        closed_count = 0
+        error_count = 0
+        
+        # Check each database trade against IG positions
+        for trade in open_trades:
+            deal_reference = trade.get("deal_reference")
+            
+            if not deal_reference:
+                continue
+                
+            # If trade is not in IG positions, it's closed
+            if deal_reference not in ig_deal_references:
+                try:
+                    # Mark as closed in database
+                    result = trades_collection.update_one(
+                        {"_id": trade["_id"]},
+                        {
+                            "$set": {
+                                "status": "CLOSED",
+                                "close_timestamp": datetime.utcnow(),
+                                "close_reason": "Auto-sync: Found closed in IG",
+                                "last_update": datetime.utcnow()
+                            }
+                        }
+                    )
+                    
+                    if result.modified_count > 0:
+                        closed_count += 1
+                        print(f"💾 Auto-closed: {trade.get('market')} {deal_reference}")
+                    
+                except Exception as e:
+                    print(f"❌ Error closing {deal_reference}: {e}")
+                    error_count += 1
+            else:
+                synced_count += 1
+        
+        print(f"✅ Sync complete: {synced_count} still open, {closed_count} auto-closed, {error_count} errors")
+        return {"synced": synced_count, "closed": closed_count, "errors": error_count}
+        
+    except Exception as e:
+        print(f"❌ Trade sync error: {e}")
+        return {"synced": 0, "closed": 0, "errors": 1}
+
 def get_trade_lifecycle_status(market: str = None):
     """Get summary of trade lifecycle for monitoring"""
     query = {}

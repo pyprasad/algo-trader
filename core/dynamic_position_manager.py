@@ -547,6 +547,31 @@ class DynamicPositionManager:
                 if success:
                     print(f"✅ Emergency closed position {analysis.deal_reference}")
                     
+                    # CRITICAL: Update database to mark trade as CLOSED
+                    try:
+                        from data.db import trades_collection
+                        update_result = trades_collection.update_one(
+                            {"deal_reference": analysis.deal_reference},
+                            {
+                                "$set": {
+                                    "status": "CLOSED",
+                                    "close_timestamp": datetime.utcnow(),
+                                    "close_level": analysis.current_price,
+                                    "close_reason": f"Emergency close: {reason}",
+                                    "profit_loss": analysis.current_pnl,
+                                    "last_update": datetime.utcnow()
+                                }
+                            }
+                        )
+                        
+                        if update_result.modified_count > 0:
+                            print(f"💾 Database updated: {analysis.deal_reference} marked as CLOSED")
+                        else:
+                            print(f"⚠️ Database update failed for {analysis.deal_reference}")
+                            
+                    except Exception as db_error:
+                        print(f"❌ Database update error for {analysis.deal_reference}: {db_error}")
+                    
                     # Remove from emergency monitoring
                     with self.lock:
                         self.emergency_positions.pop(analysis.deal_reference, None)

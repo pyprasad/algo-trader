@@ -13,7 +13,7 @@ from data.multi_market_collector import MultiMarketCollector
 from core.enhanced_strategy_engine import get_enhanced_strategy_engine
 from core.market_adaptive_strategy import get_market_adaptive_strategy
 from core.trade_executor import execute_trade
-from data.db import get_market_tick_data, get_available_markets, get_account_balance, get_trade_lifecycle_status
+from data.db import get_market_tick_data, get_available_markets, get_account_balance, get_trade_lifecycle_status, sync_trade_statuses_with_ig
 from data.account_streamer import start_account_streaming, stop_account_streaming, get_live_account_data
 from data.trade_streamer import start_trade_streaming, stop_trade_streaming, get_live_active_trades
 from utils.market_config_loader import MarketConfigLoader
@@ -342,8 +342,22 @@ if __name__ == "__main__":
         trading_system.start_trading()
         
         # Keep the system running
+        sync_counter = 0
         while True:
             time.sleep(60)
+            sync_counter += 1
+            
+            # Sync database with IG every 5 minutes to prevent corrupted records
+            if sync_counter >= 5:  # Every 5 minutes
+                try:
+                    print("🔄 Syncing database with IG API...")
+                    sync_result = sync_trade_statuses_with_ig()
+                    if sync_result["closed"] > 0:
+                        print(f"🧹 Auto-closed {sync_result['closed']} stale trades")
+                except Exception as e:
+                    print(f"⚠️ Database sync error: {e}")
+                sync_counter = 0
+            
             status = trading_system.get_system_status()
             
             # Show system status with live account data
