@@ -16,11 +16,9 @@ Author: Professional Trading Analytics
 import threading
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict
 import numpy as np
-import pandas as pd
 from collections import deque, defaultdict
-import json
 
 from data.db import trades_collection, get_account_balance
 from core.emergency_risk_manager import get_emergency_risk_manager
@@ -41,7 +39,8 @@ class ProfessionalTradingMonitor:
         
         # Risk metrics
         self.max_drawdown = 0.0
-        self.peak_balance = get_account_balance()
+        initial_balance = get_account_balance()
+        self.peak_balance = initial_balance if initial_balance is not None else 0.0
         self.current_drawdown = 0.0
         
         # Trade quality tracking
@@ -110,12 +109,21 @@ class ProfessionalTradingMonitor:
         # Get current account balance
         current_balance = get_account_balance()
         
+        # Handle None values
+        if current_balance is None:
+            print("⚠️ Warning: Unable to get account balance")
+            return
+            
+        # Initialize peak_balance if it's None
+        if self.peak_balance is None:
+            self.peak_balance = current_balance
+        
         # Update peak and drawdown
         if current_balance > self.peak_balance:
             self.peak_balance = current_balance
             self.current_drawdown = 0.0
         else:
-            self.current_drawdown = (self.peak_balance - current_balance) / self.peak_balance
+            self.current_drawdown = (self.peak_balance - current_balance) / self.peak_balance if self.peak_balance > 0 else 0.0
             
         if self.current_drawdown > self.max_drawdown:
             self.max_drawdown = self.current_drawdown
@@ -155,7 +163,10 @@ class ProfessionalTradingMonitor:
         
         # Get returns series
         balances = [p['balance'] for p in self.performance_history]
-        returns = np.diff(balances) / balances[:-1]
+        # Ensure no division by zero
+        balances_array = np.array(balances[:-1])
+        balances_array[balances_array == 0] = 1e-10  # Replace zeros with small value
+        returns = np.diff(balances) / balances_array
         
         # Calculate Sharpe ratio (annualized)
         if len(returns) > 0 and np.std(returns) > 0:
@@ -229,9 +240,9 @@ class ProfessionalTradingMonitor:
         stop_loss = trade.get('stop_loss', 0)
         profit_loss = trade.get('profit_loss', 0)
         
-        if entry_price and stop_loss:
+        if entry_price and stop_loss and entry_price != 0 and stop_loss != 0:
             risk_amount = abs(entry_price - stop_loss) * trade.get('size', 1)
-            if risk_amount > 0:
+            if risk_amount > 0 and profit_loss is not None:
                 actual_rr = profit_loss / risk_amount
                 if actual_rr > 1:
                     score += 0.2  # Good risk-reward
@@ -256,8 +267,6 @@ class ProfessionalTradingMonitor:
     
     def check_performance_alerts(self):
         """Check for performance alerts and warnings"""
-        
-        current_time = datetime.now()
         
         # Drawdown alerts
         if self.current_drawdown >= self.DRAWDOWN_CRITICAL:
@@ -375,7 +384,7 @@ class ProfessionalTradingMonitor:
         # Calculate returns
         if len(self.performance_history) > 1:
             initial_balance = self.performance_history[0]['balance']
-            if initial_balance and initial_balance > 0:
+            if initial_balance is not None and initial_balance > 0:
                 total_return = (current_balance - initial_balance) / initial_balance
             else:
                 total_return = 0

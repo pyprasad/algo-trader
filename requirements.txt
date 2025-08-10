@@ -15,5 +15,4 @@ pytz
 joblib
 textblob
 nltk
-pytz
-torch
+torch  # Requires Python <=3.12
