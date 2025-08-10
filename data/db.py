@@ -187,27 +187,175 @@ def cleanup_old_pending_trades(market: str = None, timeout_minutes: int = 5):
 
 def can_open_new_trade(market: str, max_pending: int = 2) -> bool:
     """
-    Check if we can open a new trade for this market
-    - Only OPEN trades block new trades (confirmed positions)
-    - Allow limited PENDING trades (they may timeout/fail)
-    - Clean up old PENDING trades automatically
-    """
-    # First, clean up old pending trades
-    cleanup_old_pending_trades(market)
+    BULLETPROOF POSITION CHECKING with multi-layer validation
     
-    # Only count OPEN trades as blocking (confirmed positions)
+    🛡️ CRITICAL SAFETY SYSTEM - DO NOT MODIFY WITHOUT EXTREME CAUTION
+    
+    This function implements multiple layers of validation to prevent
+    multiple positions in the same market:
+    
+    Layer 1: Database cleanup and validation
+    Layer 2: Live IG API position check 
+    Layer 3: Pending trade limits
+    Layer 4: Recent trade timing check
+    Layer 5: Final safety validation
+    """
+    import time
+    from datetime import datetime, timedelta
+    
+    print(f"🛡️ BULLETPROOF POSITION CHECK for {market}")
+    print("=" * 60)
+    
+    # LAYER 1: Clean up old pending trades first
+    print("🧹 Layer 1: Cleaning up old pending trades...")
+    cleanup_result = cleanup_old_pending_trades(market, timeout_minutes=3)  # Reduced timeout for safety
+    if cleanup_result > 0:
+        print(f"   ✅ Cleaned {cleanup_result} old pending trades")
+    
+    # LAYER 2: CRITICAL - Sync with IG API before any decision
+    print("🔄 Layer 2: Syncing with IG API positions...")
+    try:
+        sync_result = sync_trade_statuses_with_ig()
+        print(f"   ✅ IG sync completed: {sync_result.get('closed', 0)} trades closed")
+    except Exception as e:
+        print(f"   ❌ WARNING: IG sync failed: {e}")
+        # FAIL-SAFE: If we can't sync with IG, we BLOCK the trade for safety
+        print(f"   🚨 BLOCKING trade due to IG sync failure (fail-safe mode)")
+        return False
+    
+    # LAYER 3: Database position validation (after sync)
+    print("📊 Layer 3: Database position validation...")
     open_trades = get_open_trades(market)
     if len(open_trades) > 0:
-        print(f"⚠️ Cannot open new {market} trade: {len(open_trades)} confirmed open positions")
+        print(f"   ❌ BLOCKED: {len(open_trades)} confirmed open positions found")
+        for trade in open_trades:
+            print(f"      - {trade.get('deal_reference', 'N/A')} | {trade.get('direction', 'N/A')} | Status: {trade.get('status', 'N/A')}")
+        return False
+    print("   ✅ No open positions found in database")
+    
+    # LAYER 4: Live IG API position check (double verification)
+    print("🌐 Layer 4: Live IG API position verification...")
+    try:
+        ig_positions = get_live_ig_positions(market)
+        if len(ig_positions) > 0:
+            print(f"   ❌ CRITICAL BLOCK: {len(ig_positions)} live positions found on IG")
+            for pos in ig_positions:
+                print(f"      - Deal ID: {pos.get('dealId', 'N/A')} | Size: {pos.get('size', 'N/A')} | Direction: {pos.get('direction', 'N/A')}")
+            return False
+        print("   ✅ No live positions found on IG API")
+    except Exception as e:
+        print(f"   ❌ WARNING: Live IG check failed: {e}")
+        # FAIL-SAFE: If we can't check IG live positions, we BLOCK for safety
+        print(f"   🚨 BLOCKING trade due to live IG check failure (fail-safe mode)")
         return False
     
-    # Allow limited PENDING trades (they may fail/timeout)
+    # LAYER 5: Pending trade limits (but more restrictive)
+    print("⏳ Layer 5: Pending trade validation...")
     pending_trades = list(trades_collection.find({"market": market, "status": "PENDING"}))
     if len(pending_trades) >= max_pending:
-        print(f"⚠️ Cannot open new {market} trade: {len(pending_trades)} pending trades (max: {max_pending})")
+        print(f"   ❌ BLOCKED: {len(pending_trades)} pending trades (max: {max_pending})")
+        for trade in pending_trades:
+            print(f"      - {trade.get('deal_reference', 'N/A')} | {trade.get('timestamp', 'N/A')}")
         return False
+    print(f"   ✅ Pending trades: {len(pending_trades)}/{max_pending}")
+    
+    # LAYER 6: Recent trade timing check (prevent rapid successive trades)
+    print("⏰ Layer 6: Recent trade timing validation...")
+    recent_cutoff = datetime.utcnow() - timedelta(minutes=5)  # No trades within 5 minutes
+    recent_trades = list(trades_collection.find({
+        "market": market,
+        "timestamp": {"$gte": recent_cutoff},
+        "status": {"$in": ["OPEN", "PENDING", "ACCEPTED"]}
+    }))
+    
+    if len(recent_trades) > 0:
+        print(f"   ❌ BLOCKED: {len(recent_trades)} recent trades within 5 minutes")
+        for trade in recent_trades:
+            print(f"      - {trade.get('deal_reference', 'N/A')} | {trade.get('timestamp', 'N/A')} | {trade.get('status', 'N/A')}")
+        return False
+    print("   ✅ No recent trades within 5 minutes")
+    
+    # LAYER 7: Final safety validation
+    print("🔒 Layer 7: Final safety checks...")
+    
+    # Check if this market had any trades in the last hour that are unresolved
+    hour_cutoff = datetime.utcnow() - timedelta(hours=1)
+    unresolved_trades = list(trades_collection.find({
+        "market": market,
+        "timestamp": {"$gte": hour_cutoff},
+        "status": {"$in": ["PENDING"]}  # Only truly problematic statuses
+    }))
+    
+    if len(unresolved_trades) > 0:
+        print(f"   ⚠️ WARNING: {len(unresolved_trades)} unresolved trades in last hour")
+        # Don't block, but log for monitoring
+        for trade in unresolved_trades:
+            print(f"      - {trade.get('deal_reference', 'N/A')} | {trade.get('timestamp', 'N/A')} | {trade.get('status', 'N/A')}")
+    
+    print("=" * 60)
+    print(f"✅ BULLETPROOF CHECK PASSED: {market} is safe for new trade")
+    print("=" * 60)
     
     return True
+
+def get_live_ig_positions(market: str = None):
+    """
+    Get live positions directly from IG API for a specific market
+    Used by bulletproof position checking for real-time validation
+    """
+    try:
+        from utils.auth_helper import authenticate
+        from utils.config_loader import load_global_config, load_asset_config
+        import requests
+        
+        config = load_global_config()
+        
+        # Get IG API credentials
+        cst, xst, _, _ = authenticate()
+        headers = {
+            "X-IG-API-KEY": config["ig"]["api_key"],
+            "CST": cst,
+            "X-SECURITY-TOKEN": xst,
+            "Content-Type": "application/json"
+        }
+        base_url = config["ig"]["base_url"]
+        
+        # Get all open positions
+        url = f"{base_url}/positions"
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        
+        positions_data = response.json()
+        positions = positions_data.get('positions', [])
+        
+        if market:
+            # Filter positions for specific market
+            try:
+                asset_config = load_asset_config(market)
+                market_epic = asset_config["epic"]
+                
+                filtered_positions = []
+                for pos in positions:
+                    if pos.get('market', {}).get('epic') == market_epic:
+                        filtered_positions.append({
+                            'dealId': pos.get('position', {}).get('dealId'),
+                            'size': pos.get('position', {}).get('size'),
+                            'direction': pos.get('position', {}).get('direction'),
+                            'epic': pos.get('market', {}).get('epic'),
+                            'instrumentName': pos.get('market', {}).get('instrumentName')
+                        })
+                return filtered_positions
+                
+            except Exception as e:
+                print(f"❌ Error filtering positions for {market}: {e}")
+                return []
+        
+        # Return all positions if no market specified
+        return positions
+        
+    except Exception as e:
+        print(f"❌ Error fetching live IG positions: {e}")
+        raise e
 
 def sync_trade_statuses_with_ig():
     """

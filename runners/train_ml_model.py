@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from models.ml_predictor import MLTradingPredictor
-from data.db import collection as mongo_collection
+from data.db import db, sanitize_collection_name
 
 def fetch_training_data(asset: str, days_back: int = 30) -> pd.DataFrame:
     """
@@ -29,9 +29,17 @@ def fetch_training_data(asset: str, days_back: int = 30) -> pd.DataFrame:
     end_date = datetime.utcnow()
     start_date = end_date - timedelta(days=days_back)
     
+    # Get market-specific collection
+    collection_name = sanitize_collection_name(asset)
+    
+    # Check if collection exists
+    if collection_name not in db.list_collection_names():
+        raise ValueError(f"No tick data found for {asset}. Collection '{collection_name}' does not exist.")
+    
+    tick_collection = db[collection_name]
+    
     # Query MongoDB
-    cursor = mongo_collection.find({
-        "market": asset,
+    cursor = tick_collection.find({
         "timestamp": {"$gte": start_date, "$lte": end_date}
     }).sort("timestamp", 1)
     

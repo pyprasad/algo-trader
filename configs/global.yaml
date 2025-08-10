@@ -1,69 +1,180 @@
-# configs/global.yaml
-
 ig:
-  api_key: "3772057d9d126d6d19d7cb6ec146404de00e5421"
-  username: "yuganp"
-  password: "Testing@123"
-  base_url: "https://demo-api.ig.com/gateway/deal"
-  session_duration: 3600  # in seconds
-  cache_file: "session_cache.json"
-  log_file: "ig_streaming.log"
-
+  api_key: 3772057d9d126d6d19d7cb6ec146404de00e5421
+  username: yuganp
+  password: Testing@123
+  base_url: https://demo-api.ig.com/gateway/deal
+  session_duration: 3600
+  cache_file: session_cache.json
+  log_file: ig_streaming.log
 mongodb:
-  uri: "mongodb://127.0.0.1:27017"
-  database: "ftse100_scalping_bot"
-  collection: "ftse100"
-
+  uri: mongodb://127.0.0.1:27017
+  database: ftse100_scalping_bot
+  collection: ftse100
 strategy:
-  mode: "HISTORICAL"  # or LIVE
+  mode: HISTORICAL
   rsi_period: 14
-  rsi_buy_threshold: 70  # More sensitive - was 80
-  rsi_sell_threshold: 30  # More sensitive - was 20
+  rsi_buy_threshold: 70
+  rsi_sell_threshold: 30
   stop_loss_pips: 10
   take_profit_pips: 20
   dynamic_atr_sltp: true
-
-# 🚀 Dynamic Position Management
 dynamic_limits:
-  enabled: true  # Feature flag - set to true to enable
-  update_interval_seconds: 30  # How often to check and adjust limits
-  confidence_threshold: 0.7  # Minimum strategy confidence to increase limits
-  max_limit_increase: 2.0  # Maximum multiplier for take profit (e.g., 2x = 40 pips instead of 20)
-  min_limit_decrease: 0.5  # Minimum multiplier for take profit (e.g., 0.5x = 10 pips instead of 20)
-  pnl_threshold_percent: 5.0  # P&L threshold to trigger limit adjustments (5% of entry)
-  strategy_lookback_minutes: 15  # How far back to analyze strategy performance
-  
-  # 🚨 Emergency Capital Protection
+  enabled: true
+  update_interval_seconds: 30
+  confidence_threshold: 0.7
+  max_limit_increase: 2.0
+  min_limit_decrease: 0.5
+  pnl_threshold_percent: 5.0
+  strategy_lookback_minutes: 15
   emergency_protection:
-    enabled: true  # Enable emergency stop loss adjustment
-    immediate_loss_threshold: 15  # Close position if loss exceeds this (pips)
-    rapid_check_interval: 5  # Check every 5 seconds for first 5 minutes
-    rapid_check_duration: 300  # Duration of rapid checking (5 minutes)
-    emergency_stop_multiplier: 0.7  # Tighten stop loss to 70% of original
-    adverse_signal_close: true  # Close if signal flips opposite immediately
-
-# 📰 News Sentiment Analysis Configuration
+    enabled: true
+    immediate_loss_threshold: 15
+    rapid_check_interval: 5
+    rapid_check_duration: 300
+    emergency_stop_multiplier: 0.7
+    adverse_signal_close: true
 sentiment_analysis:
   enabled: true
-  check_interval_minutes: 60  # Check every hour (configurable)
-  respect_market_hours: true  # Only run during market hours + buffer
-  markets: ["DAX", "FTSE"]  # Markets to analyze
-  min_confidence_threshold: 0.6  # Minimum confidence to use sentiment signals
-  
-  # API Configuration
+  check_interval_minutes: 60
+  respect_market_hours: true
+  markets:
+  - DAX
+  - FTSE
+  min_confidence_threshold: 0.6
   api_sources:
     newsapi:
       enabled: true
-      key: "b784c918f7864e06b203f9dece8f09af"
+      key: b784c918f7864e06b203f9dece8f09af
     alpha_vantage:
       enabled: true
-      key: "WB87DUF9M5MPKMTM"
+      key: WB87DUF9M5MPKMTM
     polygon:
       enabled: true
-      key: "sY7ZjaLRvgKKItf2daISi6TDfXeaWuPw"
-  
-  # Market Hours Configuration (London time)
+      key: sY7ZjaLRvgKKItf2daISi6TDfXeaWuPw
   market_hours:
-    start_hour: 7   # 1 hour before FTSE opens
-    end_hour: 18    # 30 minutes after DAX closes
+    start_hour: 7
+    end_hour: 18
     skip_weekends: true
+professional_trading:
+  enabled: true
+  system_mode: conservative
+  # 🏦 Smart Money Concepts Configuration (NEW!)
+  smart_money:
+    enabled: true
+    min_confidence: 0.6
+    lookback_periods: 50
+    min_block_strength: 2.0
+    order_blocks:
+      enabled: true
+      validation_required: true
+    fair_value_gaps:
+      enabled: true  
+      max_gap_age: 24  # hours
+    liquidity_sweeps:
+      enabled: true
+      min_rejection: 0.6
+    market_structure:
+      enabled: true
+      swing_detection: true
+  # 🧠 Advanced ML Configuration (NEW!)
+  advanced_ml:
+    enabled: true
+    model_type: ensemble  # lstm, transformer, or ensemble
+    confidence_threshold: 0.7
+    sequence_length: 50
+    training:
+      min_training_samples: 2000
+      epochs: 100
+      validation_split: 0.2
+      batch_size: 32
+      learning_rate: 0.001
+      early_stopping_patience: 20
+    models:
+      lstm:
+        enabled: true
+        hidden_size: 128
+        num_layers: 2
+        dropout: 0.2
+        weight: 0.5
+      transformer:
+        enabled: true
+        d_model: 128
+        num_heads: 8
+        num_layers: 4
+        dropout: 0.1
+        weight: 0.5
+    regime_detection:
+      enabled: true
+      lookback: 100
+      regime_multipliers:
+        bullish_trend: 1.3
+        bearish_trend: 1.3
+        trending_up: 1.2
+        trending_down: 1.2
+        volatile: 1.1
+        mean_reverting: 1.0
+        low_volatility: 0.9
+        neutral: 1.0
+        unknown: 0.8
+    walk_forward_validation:
+      enabled: true
+      train_window_days: 90
+      test_window_days: 30
+      min_train_samples: 1000
+      retraining_threshold: 0.1
+    model_persistence:
+      save_models: true
+      model_directory: "models/"
+      auto_retrain: true
+      retrain_frequency_days: 7
+  modes:
+    conservative:
+      min_signal_confidence: 0.75
+      analysis_interval_minutes: 5
+      max_trades_per_hour: 1
+      daily_loss_limit: 200
+      trade_frequency: low
+    moderate:
+      min_signal_confidence: 0.65
+      analysis_interval_minutes: 3
+      max_trades_per_hour: 2
+      daily_loss_limit: 300
+      trade_frequency: medium
+    aggressive:
+      min_signal_confidence: 0.6
+      analysis_interval_minutes: 2
+      max_trades_per_hour: 3
+      daily_loss_limit: 500
+      trade_frequency: high
+    custom:
+      min_signal_confidence: 0.7
+      analysis_interval_minutes: 4
+      max_trades_per_hour: 2
+      daily_loss_limit: 250
+  emergency_risk:
+    max_loss_per_trade: 0.02
+    daily_loss_limit: 0.05
+    max_position_size: 0.01
+    max_total_exposure: 0.1
+    max_consecutive_losses: 5
+    max_correlation_exposure: 0.03
+    high_volatility_threshold: 0.03
+    extreme_volatility_threshold: 0.05
+  strategy:
+    min_signal_strength: 0.6
+    trend_confirmation_required: true
+    rsi_adaptive_enabled: true
+    timeframe_weights:
+      1M: 0.1
+      5M: 0.2
+      15M: 0.3
+      1H: 0.4
+  monitoring:
+    enabled: true
+    update_interval_seconds: 30
+    drawdown_warning: 0.05
+    drawdown_critical: 0.1
+    min_sharpe_ratio: 1.0
+    min_win_rate: 0.4
+    hourly_reports: true
+    performance_alerts: true

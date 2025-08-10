@@ -20,6 +20,9 @@ from utils.market_config_loader import MarketConfigLoader
 from utils.trading_safety import get_trading_safety_manager
 from core.dynamic_position_manager import get_dynamic_position_manager
 from data.news_sentiment import get_sentiment_engine
+from core.emergency_risk_manager import get_emergency_risk_manager
+from core.professional_strategy_engine import get_professional_strategy_engine
+from core.professional_monitor import get_professional_monitor
 
 class MultiMarketTradingSystem:
     def __init__(self, config_loader: MarketConfigLoader = None):
@@ -71,6 +74,18 @@ class MultiMarketTradingSystem:
         self.sentiment_engine = get_sentiment_engine()
         print("📰 News sentiment analysis engine initialized")
         
+        # Initialize professional risk management
+        self.emergency_risk_manager = get_emergency_risk_manager()
+        print("🚨 Emergency risk management initialized")
+        
+        # Initialize professional strategy engine
+        self.professional_strategy = get_professional_strategy_engine()
+        print("📈 Professional strategy engine initialized")
+        
+        # Initialize professional monitoring
+        self.professional_monitor = get_professional_monitor()
+        print("📊 Professional performance monitor initialized")
+        
     def start_data_collection(self):
         """Start collecting tick data for all markets"""
         print("📡 Starting multi-market data collection...")
@@ -94,9 +109,21 @@ class MultiMarketTradingSystem:
                 # Extract prices for analysis
                 prices = [tick['bid'] for tick in reversed(recent_ticks)]  # Reverse to get chronological order
                 
-                # Run market-adaptive strategy analysis (prioritized over enhanced strategy)
-                print(f"🔍 {market_name}: Analyzing {len(prices)} price points...")
-                signals = self.market_adaptive_strategy.analyze_market_conditions(prices, market_name)
+                # STEP 1: PROFESSIONAL STRATEGY ANALYSIS
+                print(f"🔍 {market_name}: Professional analysis of {len(prices)} price points...")
+                
+                # Get professional signal first
+                professional_signal = self.professional_strategy.analyze_market(prices, market_name)
+                print(f"📈 Professional Signal: {professional_signal.get('signal', 'NONE')} (strength: {professional_signal.get('strength', 0):.2f})")
+                
+                # Use professional signal if strong enough, otherwise fallback
+                if professional_signal.get('strength', 0) >= 0.6:
+                    signals = professional_signal
+                    signals['strategy_source'] = 'professional_engine'
+                else:
+                    # Fallback to market-adaptive strategy
+                    print(f"⚠️ {market_name}: Professional signal too weak, using adaptive strategy")
+                    signals = self.market_adaptive_strategy.analyze_market_conditions(prices, market_name)
                 
                 # Log signal result
                 if signals:
@@ -239,7 +266,20 @@ class MultiMarketTradingSystem:
         except Exception as e:
             print(f"⚠️ Sentiment analysis failed to start: {e}")
         
-        print("✅ Multi-market trading system is running!")
+        # Start professional monitoring
+        print("📊 Starting professional performance monitoring...")
+        try:
+            self.professional_monitor.start_monitoring()
+            self.emergency_risk_manager.start_monitoring()
+            print("✅ Professional monitoring systems started")
+        except Exception as e:
+            print(f"⚠️ Professional monitoring failed to start: {e}")
+        
+        print("🎯 PROFESSIONAL TRADING SYSTEM IS RUNNING!")
+        print("   🛡️ Emergency risk controls: ACTIVE")
+        print("   📈 Professional strategies: ACTIVE")  
+        print("   📊 Performance monitoring: ACTIVE")
+        print("   🚨 Circuit breakers: ACTIVE")
         
     def stop_trading(self):
         """Stop the trading system"""
@@ -268,6 +308,14 @@ class MultiMarketTradingSystem:
             print("📰 News sentiment analysis stopped")
         except Exception as e:
             print(f"⚠️ Error stopping sentiment analysis: {e}")
+        
+        # Stop professional monitoring systems
+        try:
+            self.professional_monitor.stop_monitoring()
+            self.emergency_risk_manager.stop_monitoring()
+            print("📊 Professional monitoring systems stopped")
+        except Exception as e:
+            print(f"⚠️ Error stopping professional monitoring: {e}")
         
         # Shutdown thread executor
         self.executor.shutdown(wait=True)
@@ -387,12 +435,25 @@ if __name__ == "__main__":
                 if account_data.get('last_update'):
                     print(f"💰 Live Balance: £{current_balance:.2f} | P&L: £{account_data.get('pnl', 0):.2f} | Margin: £{account_data.get('margin', 0):.2f}")
                 
-                # Show safety status
-                safety_status = trading_system.safety_manager.get_trading_status()
-                if safety_status['trading_suspended']:
-                    print(f"🚨 TRADING SUSPENDED: {safety_status['suspension_reason']}")
-                else:
-                    print(f"🛡️ Safety: Balance {safety_status['balance_percentage']:.1f}% | Open Positions: {safety_status['total_open_positions']}")
+                # Show professional risk status  
+                try:
+                    risk_status = trading_system.emergency_risk_manager.get_risk_status()
+                    if risk_status['trading_halted']:
+                        print(f"🚨 EMERGENCY HALT: {risk_status['halt_reason']}")
+                    else:
+                        print(f"🛡️ Professional Risk: Daily P&L {risk_status['daily_pnl']:+.2f} | Positions {risk_status['active_positions']} | Losses {risk_status['consecutive_losses']}")
+                        
+                    # Show circuit breaker status
+                    active_breakers = [name for name, active in risk_status['circuit_breakers'].items() if active]
+                    if active_breakers:
+                        print(f"🚨 Active Circuit Breakers: {', '.join(active_breakers)}")
+                except:
+                    # Fallback to original safety status
+                    safety_status = trading_system.safety_manager.get_trading_status()
+                    if safety_status['trading_suspended']:
+                        print(f"🚨 TRADING SUSPENDED: {safety_status['suspension_reason']}")
+                    else:
+                        print(f"🛡️ Safety: Balance {safety_status['balance_percentage']:.1f}% | Open Positions: {safety_status['total_open_positions']}")
                 
                 # Show dynamic position management status
                 dpm_status = trading_system.dynamic_position_manager.get_status()

@@ -16,3 +16,4 @@ joblib
 textblob
 nltk
 pytz
+torch
