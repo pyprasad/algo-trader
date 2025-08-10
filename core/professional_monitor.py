@@ -272,7 +272,7 @@ class ProfessionalTradingMonitor:
         # Performance alerts
         if 'sharpe_ratio' in self.daily_metrics:
             sharpe = self.daily_metrics['sharpe_ratio']
-            if sharpe < 0.5 and len(self.performance_history) > 100:
+            if sharpe is not None and sharpe < 0.5 and len(self.performance_history) > 100:
                 self._send_alert('LOW_SHARPE', 
                                f'Low Sharpe ratio: {sharpe:.2f}', 
                                'warning')
@@ -280,7 +280,7 @@ class ProfessionalTradingMonitor:
         # Win rate alerts
         if 'win_rate' in self.daily_metrics:
             win_rate = self.daily_metrics['win_rate']
-            if win_rate < self.MIN_WIN_RATE and self.daily_metrics.get('total_trades', 0) > 10:
+            if win_rate is not None and win_rate < self.MIN_WIN_RATE and self.daily_metrics.get('total_trades', 0) > 10:
                 self._send_alert('LOW_WIN_RATE', 
                                f'Low win rate: {win_rate:.1%}', 
                                'warning')
