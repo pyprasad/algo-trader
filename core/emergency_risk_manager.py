@@ -27,6 +27,9 @@ with open("configs/global.yaml", "r") as f:
 from data.db import trades_collection, get_account_balance
 from utils.config_loader import load_global_config
 
+# Economic calendar integration (lazy import to avoid circular dependencies)
+_economic_calendar_monitor = None
+
 class EmergencyRiskManager:
     """
     Professional-grade risk management system with multiple safety layers
@@ -67,7 +70,8 @@ class EmergencyRiskManager:
             'consecutive_losses': False,
             'volatility': False,
             'correlation': False,
-            'drawdown': False
+            'drawdown': False,
+            'economic_event': False
         }
         
         # Initialize monitoring
@@ -90,6 +94,11 @@ class EmergencyRiskManager:
         # Check if trading is halted
         if self.trading_halted:
             return False, f"Trading halted: {self.halt_reason}"
+        
+        # Check for economic event-based trading pause
+        economic_pause_active, economic_reason = self._check_economic_event_pause(market)
+        if economic_pause_active:
+            return False, f"Economic event pause: {economic_reason}"
         
         # Get current account balance
         account_balance = get_account_balance()
@@ -510,6 +519,109 @@ class EmergencyRiskManager:
             except Exception as e:
                 print(f"❌ Risk monitoring error: {e}")
                 time.sleep(10)
+    
+    def _check_economic_event_pause(self, market: str = None) -> Tuple[bool, Optional[str]]:
+        """Check if trading should be paused due to economic events"""
+        
+        try:
+            # Lazy import to avoid circular dependencies
+            global _economic_calendar_monitor
+            if _economic_calendar_monitor is None:
+                try:
+                    from core.economic_calendar_monitor import get_economic_calendar_monitor
+                    _economic_calendar_monitor = get_economic_calendar_monitor()
+                except ImportError:
+                    # Economic calendar not available
+                    return False, None
+            
+            # Check if calendar monitoring is enabled and active
+            if not _economic_calendar_monitor or not _economic_calendar_monitor.enabled:
+                return False, None
+            
+            # Check for active trading pause
+            is_paused, reason = _economic_calendar_monitor.is_trading_paused(market)
+            
+            if is_paused:
+                # Trigger economic event circuit breaker if not already triggered
+                if not self.circuit_breakers.get('economic_event', False):
+                    self.circuit_breakers['economic_event'] = True
+                    print(f"📅 Economic event trading pause activated: {reason}")
+                
+                return True, reason
+            else:
+                # Reset economic event circuit breaker if it was active
+                if self.circuit_breakers.get('economic_event', False):
+                    self.circuit_breakers['economic_event'] = False
+                    print("📅 Economic event trading pause lifted")
+                
+                return False, None
+                
+        except Exception as e:
+            print(f"❌ Error checking economic event pause: {e}")
+            return False, None
+    
+    def get_economic_calendar_status(self) -> Dict:
+        """Get current economic calendar status"""
+        
+        try:
+            global _economic_calendar_monitor
+            if _economic_calendar_monitor is None:
+                try:
+                    from core.economic_calendar_monitor import get_economic_calendar_monitor
+                    _economic_calendar_monitor = get_economic_calendar_monitor()
+                except ImportError:
+                    return {'available': False, 'error': 'Economic calendar not installed'}
+            
+            if not _economic_calendar_monitor:
+                return {'available': False, 'error': 'Economic calendar not initialized'}
+            
+            # Get calendar summary
+            summary = _economic_calendar_monitor.get_calendar_summary()
+            
+            return {
+                'available': True,
+                'monitoring_active': summary.get('monitoring_active', False),
+                'is_paused': summary.get('current_pause', {}).get('is_paused', False),
+                'pause_reason': summary.get('current_pause', {}).get('reason'),
+                'next_pause': summary.get('next_pause'),
+                'upcoming_events_24h': summary.get('upcoming_events', {}).get('next_24h', 0),
+                'last_update': summary.get('last_update')
+            }
+            
+        except Exception as e:
+            return {'available': False, 'error': str(e)}
+    
+    def should_close_positions_before_event(self) -> Tuple[bool, Optional[str]]:
+        """Check if positions should be closed before upcoming high-impact event"""
+        
+        try:
+            global _economic_calendar_monitor
+            if _economic_calendar_monitor is None:
+                try:
+                    from core.economic_calendar_monitor import get_economic_calendar_monitor
+                    _economic_calendar_monitor = get_economic_calendar_monitor()
+                except ImportError:
+                    return False, None
+            
+            if not _economic_calendar_monitor or not _economic_calendar_monitor.enabled:
+                return False, None
+            
+            # Check for upcoming high-impact events in next 2 hours
+            next_pause = _economic_calendar_monitor.get_next_pause_info()
+            
+            if next_pause:
+                time_until_pause = next_pause['time_until_pause']
+                
+                # If pause starts within 30 minutes, recommend closing positions
+                if time_until_pause.total_seconds() <= 1800:  # 30 minutes
+                    reason = f"High-impact {next_pause['event_name']} in {time_until_pause.total_seconds()/60:.0f} minutes"
+                    return True, reason
+            
+            return False, None
+            
+        except Exception as e:
+            print(f"❌ Error checking position closure recommendation: {e}")
+            return False, None
 
 # Global instance
 _emergency_risk_manager = None

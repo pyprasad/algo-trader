@@ -1,0 +1,54 @@
+economic_calendar:
+  enabled: true
+  event_opportunity_multiplier: 1.5
+  high_impact_events:
+  - FOMC Meeting
+  - Interest Rate Decision
+  - ECB Meeting
+  - BOE Meeting
+  - Non-Farm Payrolls
+  pause_after_minutes: 30
+  pause_before_minutes: 15
+  strategy: event_trading
+  trade_during_events: true
+emergency_risk:
+  daily_loss_limit: 0.08
+  extreme_volatility_threshold: 0.08
+  high_volatility_threshold: 0.05
+  max_consecutive_losses: 6
+  max_loss_per_trade: 0.04
+  max_position_size: 0.03
+  max_total_exposure: 0.15
+professional_trading:
+  analysis_interval_minutes: 2
+  daily_loss_limit: 800
+  enabled: true
+  max_trades_per_hour: 5
+  min_signal_confidence: 0.55
+  smart_money:
+    enabled: true
+    min_confidence: 0.6
+    require_confluence: false
+  system_mode: aggressive
+  trade_frequency: high
+profile_info:
+  description: Event-based volatility trading with higher risk tolerance
+  expected_characteristics:
+    avg_trade_duration: 30min-2hours
+    max_daily_risk: 8%
+    trades_per_day: 5-15
+    win_rate_target: 55-65%
+  name: aggressive
+  target_audience: Experienced traders comfortable with volatility
+sentiment_analysis:
+  contrarian_trading: true
+  enabled: true
+  min_confidence_threshold: 0.5
+  respect_negative_sentiment: false
+strategy_parameters:
+  momentum_trading: true
+  news_reaction_trading: true
+  stop_loss_multiplier: 1.2
+  take_profit_multiplier: 1.5
+  trend_confirmation_required: false
+  volatility_breakout_trading: true

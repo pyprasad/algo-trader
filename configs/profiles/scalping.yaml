@@ -1,0 +1,46 @@
+economic_calendar:
+  enabled: false
+  ignore_all_events: true
+emergency_risk:
+  daily_loss_limit: 0.12
+  max_consecutive_losses: 8
+  max_loss_per_trade: 0.02
+  max_position_size: 0.04
+  max_rapid_losses: 5
+  max_total_exposure: 0.2
+  rapid_loss_protection: true
+  rapid_loss_timeframe: 1800
+professional_trading:
+  analysis_interval_minutes: 0.5
+  daily_loss_limit: 1200
+  enabled: true
+  max_trades_per_hour: 20
+  min_signal_confidence: 0.52
+  smart_money:
+    enabled: true
+    min_confidence: 0.55
+    quick_scalp_signals: true
+  system_mode: scalping
+  trade_frequency: ultra_high
+profile_info:
+  description: High-frequency rapid trading with quick entries/exits
+  expected_characteristics:
+    avg_trade_duration: 2-15 minutes
+    max_daily_risk: 12%
+    trades_per_day: 20-100
+    win_rate_target: 52-62%
+  name: scalping
+  target_audience: Active traders comfortable with high-frequency trading
+sentiment_analysis:
+  enabled: false
+  ignore_sentiment: true
+strategy_parameters:
+  max_trade_duration_minutes: 15
+  min_trade_gap_seconds: 30
+  news_scalping: false
+  profit_target_pips: 3
+  range_scalping: true
+  scalping_mode: true
+  stop_loss_pips: 2
+  tight_spread_required: true
+  trend_scalping: true

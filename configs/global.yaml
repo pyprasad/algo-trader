@@ -57,7 +57,7 @@ sentiment_analysis:
     skip_weekends: true
 professional_trading:
   enabled: true
-  system_mode: conservative
+  system_mode: moderate
   # 🏦 Smart Money Concepts Configuration (NEW!)
   smart_money:
     enabled: true
@@ -178,3 +178,65 @@ professional_trading:
     min_win_rate: 0.4
     hourly_reports: true
     performance_alerts: true
+
+# 📅 Economic Calendar Configuration
+economic_calendar:
+  enabled: true
+  update_interval_hours: 6
+  
+  # Data sources configuration
+  data_sources:
+    alpha_vantage:
+      enabled: true
+      key: WB87DUF9M5MPKMTM
+    forexfactory:
+      enabled: true
+      username: yuganp
+      password: Testing@123
+    jblanked:
+      enabled: false
+      api_key: ""  # Add JBlanked API key if available
+  
+  # Trading pause settings
+  pause_settings:
+    high_impact_events: true
+    pause_before_minutes: 120  # 2 hours before event
+    pause_after_minutes: 120   # 2 hours after event
+    close_positions_before: true
+    
+  # High-impact events that trigger trading pauses
+  high_impact_events:
+    - "FOMC Meeting"
+    - "Interest Rate Decision"
+    - "ECB Meeting"
+    - "BOE Meeting"
+    - "Non-Farm Payrolls"
+    - "NFP"
+    - "CPI"
+    - "GDP"
+    - "Central Bank Speech"
+    - "Monetary Policy Statement"
+    - "Employment Report"
+    
+  # Market mappings - which events affect which markets
+  market_mappings:
+    BOE:
+      - "FTSE"
+      - "FTSE 100"
+    ECB:
+      - "DAX"
+      - "Germany 40"
+    FOMC:
+      - "US500"
+      - "S&P 500"
+    USD:
+      - "US500"
+      - "S&P 500"
+      - "NASDAQ"
+    EUR:
+      - "DAX"
+      - "Germany 40"
+      - "Europe 50"
+    GBP:
+      - "FTSE"
+      - "FTSE 100"

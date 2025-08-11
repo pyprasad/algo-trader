@@ -23,6 +23,7 @@ from data.news_sentiment import get_sentiment_engine
 from core.emergency_risk_manager import get_emergency_risk_manager
 from core.professional_strategy_engine import get_professional_strategy_engine
 from core.professional_monitor import get_professional_monitor
+from core.economic_calendar_monitor import get_economic_calendar_monitor
 
 class MultiMarketTradingSystem:
     def __init__(self, config_loader: MarketConfigLoader = None):
@@ -85,6 +86,10 @@ class MultiMarketTradingSystem:
         # Initialize professional monitoring
         self.professional_monitor = get_professional_monitor()
         print("📊 Professional performance monitor initialized")
+        
+        # Initialize economic calendar monitoring
+        self.economic_calendar_monitor = get_economic_calendar_monitor()
+        print("📅 Economic calendar monitor initialized")
         
     def start_data_collection(self):
         """Start collecting tick data for all markets"""
@@ -275,10 +280,21 @@ class MultiMarketTradingSystem:
         except Exception as e:
             print(f"⚠️ Professional monitoring failed to start: {e}")
         
+        # Start economic calendar monitoring
+        print("📅 Starting economic calendar monitoring...")
+        try:
+            if self.economic_calendar_monitor.start_monitoring():
+                print("✅ Economic calendar monitoring started")
+            else:
+                print("⚠️ Economic calendar monitoring disabled or failed to start")
+        except Exception as e:
+            print(f"⚠️ Economic calendar monitoring failed to start: {e}")
+        
         print("🎯 PROFESSIONAL TRADING SYSTEM IS RUNNING!")
         print("   🛡️ Emergency risk controls: ACTIVE")
         print("   📈 Professional strategies: ACTIVE")  
         print("   📊 Performance monitoring: ACTIVE")
+        print("   📅 Economic calendar monitoring: ACTIVE")
         print("   🚨 Circuit breakers: ACTIVE")
         
     def stop_trading(self):
@@ -316,6 +332,13 @@ class MultiMarketTradingSystem:
             print("📊 Professional monitoring systems stopped")
         except Exception as e:
             print(f"⚠️ Error stopping professional monitoring: {e}")
+        
+        # Stop economic calendar monitoring
+        try:
+            self.economic_calendar_monitor.stop_monitoring()
+            print("📅 Economic calendar monitoring stopped")
+        except Exception as e:
+            print(f"⚠️ Error stopping economic calendar monitoring: {e}")
         
         # Shutdown thread executor
         self.executor.shutdown(wait=True)

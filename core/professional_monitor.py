@@ -119,10 +119,10 @@ class ProfessionalTradingMonitor:
             self.peak_balance = current_balance
         
         # Update peak and drawdown
-        if current_balance > self.peak_balance:
+        if current_balance is not None and self.peak_balance is not None and current_balance > self.peak_balance:
             self.peak_balance = current_balance
             self.current_drawdown = 0.0
-        else:
+        elif current_balance is not None and self.peak_balance is not None:
             self.current_drawdown = (self.peak_balance - current_balance) / self.peak_balance if self.peak_balance > 0 else 0.0
             
         if self.current_drawdown > self.max_drawdown:
@@ -289,7 +289,8 @@ class ProfessionalTradingMonitor:
         # Win rate alerts
         if 'win_rate' in self.daily_metrics:
             win_rate = self.daily_metrics['win_rate']
-            if win_rate is not None and win_rate < self.MIN_WIN_RATE and self.daily_metrics.get('total_trades', 0) > 10:
+            total_trades = self.daily_metrics.get('total_trades', 0)
+            if win_rate is not None and total_trades is not None and win_rate < self.MIN_WIN_RATE and total_trades > 10:
                 self._send_alert('LOW_WIN_RATE', 
                                f'Low win rate: {win_rate:.1%}', 
                                'warning')
@@ -345,8 +346,14 @@ class ProfessionalTradingMonitor:
         
         # Account status
         current_balance = get_account_balance()
-        print(f"💰 Account Balance: £{current_balance:.2f}")
-        print(f"📈 Peak Balance: £{self.peak_balance:.2f}")
+        if current_balance is not None:
+            print(f"💰 Account Balance: £{current_balance:.2f}")
+        else:
+            print(f"💰 Account Balance: Unable to retrieve")
+        if self.peak_balance is not None:
+            print(f"📈 Peak Balance: £{self.peak_balance:.2f}")
+        else:
+            print(f"📈 Peak Balance: Not yet established")
         print(f"📉 Current Drawdown: {self.current_drawdown:.2%}")
         print(f"📉 Max Drawdown: {self.max_drawdown:.2%}")
         
@@ -380,11 +387,13 @@ class ProfessionalTradingMonitor:
         """Get comprehensive performance summary"""
         
         current_balance = get_account_balance()
+        if current_balance is None:
+            current_balance = 0
         
         # Calculate returns
         if len(self.performance_history) > 1:
             initial_balance = self.performance_history[0]['balance']
-            if initial_balance is not None and initial_balance > 0:
+            if initial_balance is not None and initial_balance > 0 and current_balance > 0:
                 total_return = (current_balance - initial_balance) / initial_balance
             else:
                 total_return = 0
