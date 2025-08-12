@@ -67,7 +67,7 @@ class BalanceManager:
         
         total_margin_used = sum(trade.get('margin_used', 0) for trade in open_trades)
         
-        if current_balance + total_margin_used > 0:
+        if current_balance is not None and current_balance + total_margin_used > 0:
             utilization_pct = (total_margin_used / (current_balance + total_margin_used)) * 100
         else:
             utilization_pct = 100.0
@@ -136,7 +136,7 @@ class BalanceManager:
         # Calculate risk per market
         risk_per_market = {}
         for market, exposure in market_exposure.items():
-            risk_pct = (exposure / current_balance) * 100 if current_balance > 0 else 0
+            risk_pct = (exposure / current_balance) * 100 if current_balance is not None and current_balance > 0 else 0
             risk_per_market[market] = {
                 "exposure": exposure,
                 "risk_percent": risk_pct
@@ -144,7 +144,7 @@ class BalanceManager:
         
         return {
             "total_exposure": total_exposure,
-            "exposure_to_balance_ratio": (total_exposure / current_balance) * 100 if current_balance > 0 else 0,
+            "exposure_to_balance_ratio": (total_exposure / current_balance) * 100 if current_balance is not None and current_balance > 0 else 0,
             "open_positions": len(open_trades),
             "market_risk_breakdown": risk_per_market
         }

@@ -14,7 +14,7 @@ Author: AI-Enhanced Trading System
 
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 import warnings
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -228,6 +228,11 @@ class MLTradingPredictor:
         features = features.iloc[:-lookahead_periods]
         labels = labels.iloc[:-lookahead_periods]
         
+        # Check for sufficient class diversity
+        unique_classes = labels.unique()
+        if len(unique_classes) < 2:
+            return {"error": f"Insufficient class diversity for training. Only found classes: {unique_classes}"}
+        
         # Split data
         X_train, X_test, y_train, y_test = train_test_split(
             features, labels, test_size=test_size, random_state=42, stratify=labels
@@ -308,7 +313,10 @@ class MLTradingPredictor:
             
             # Convert prediction to signal
             signal_map = {0: "HOLD", 1: "BUY", 2: "SELL"}
-            predicted_signal = signal_map[prediction]
+            # Handle array predictions
+            if hasattr(prediction, '__len__') and len(prediction) > 0:
+                prediction = prediction[0]
+            predicted_signal = signal_map[int(prediction)]
             confidence = max(probabilities)
             
             return {
@@ -461,7 +469,7 @@ class MLEnsemblePredictor:
             return {"error": f"No data found for {market}"}
         
         tick_collection = db[collection_name]
-        since = datetime.utcnow() - timedelta(hours=lookback_hours)
+        since = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
         
         cursor = tick_collection.find({"timestamp": {"$gte": since}}).sort("timestamp", 1)
         ticks = list(cursor)
@@ -537,8 +545,18 @@ class MLEnsemblePredictor:
             X_train_scaled = scaler.fit_transform(X_train)
             X_test_scaled = scaler.transform(X_test)
             
+            # Check for sufficient class diversity in training set
+            unique_train_classes = np.unique(y_train)
+            if len(unique_train_classes) < 2:
+                print(f"  ⚠️ {name}: Insufficient class diversity in training set")
+                continue
+            
             # Train model
-            model.fit(X_train_scaled, y_train)
+            try:
+                model.fit(X_train_scaled, y_train)
+            except Exception as e:
+                print(f"  ❌ {name}: Training failed - {e}")
+                continue
             
             # Evaluate
             train_score = model.score(X_train_scaled, y_train)
@@ -607,10 +625,16 @@ class MLEnsemblePredictor:
                 scaler = self.scalers[name]
                 scaled_features = scaler.transform(latest_features)
                 
-                pred = model.predict(scaled_features)[0]
-                prob = model.predict_proba(scaled_features)[0]
+                pred = model.predict(scaled_features)
+                prob = model.predict_proba(scaled_features)
                 
-                predictions[name] = pred
+                # Handle array predictions
+                if hasattr(pred, '__len__') and len(pred) > 0:
+                    pred = pred[0]
+                if hasattr(prob, '__len__') and len(prob) > 0:
+                    prob = prob[0] if len(prob.shape) > 1 else prob
+                
+                predictions[name] = int(pred)
                 probabilities[name] = prob
             
             # Ensemble voting
@@ -634,7 +658,7 @@ class MLEnsemblePredictor:
             return {
                 "ensemble_signal": ensemble_signal,
                 "confidence": float(confidence),
-                "individual_predictions": {name: signal_map[pred] for name, pred in predictions.items()},
+                "individual_predictions": {name: signal_map[int(pred)] for name, pred in predictions.items()},
                 "model_votes": {"HOLD": hold_votes, "BUY": buy_votes, "SELL": sell_votes},
                 "average_probabilities": {
                     "HOLD": float(avg_probs[0]),

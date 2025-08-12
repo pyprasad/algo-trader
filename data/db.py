@@ -1,7 +1,7 @@
 # data/db.py
 
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timezone
 import yaml
 import re
 
@@ -44,14 +44,18 @@ def log_tick(market: str, bid: float, offer: float):
     collection_name = ensure_tick_collection_exists(market)
     tick_collection = db[collection_name]
     
+    # Calculate midprice
+    midprice = (bid + offer) / 2
+    
     document = {
         "market": market,
         "bid": bid,
         "offer": offer,
-        "timestamp": datetime.utcnow()
+        "midprice": midprice,
+        "timestamp": datetime.now(timezone.utc)
     }
     tick_collection.insert_one(document)
-    print(f"📥 Tick logged to {collection_name}: {market} | Bid: {bid} | Offer: {offer}")
+    print(f"📥 Tick logged to {collection_name}: {market} | Bid: {bid} | Offer: {offer} | Mid: {midprice:.2f}")
 
 def log_trade(trade_data: dict):
     """Insert executed trade into MongoDB trades collection with lifecycle tracking"""
@@ -201,7 +205,7 @@ def can_open_new_trade(market: str, max_pending: int = 2) -> bool:
     Layer 5: Final safety validation
     """
     import time
-    from datetime import datetime, timedelta
+    from datetime import datetime, timezone, timedelta
     
     print(f"🛡️ BULLETPROOF POSITION CHECK for {market}")
     print("=" * 60)

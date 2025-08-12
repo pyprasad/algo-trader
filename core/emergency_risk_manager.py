@@ -14,7 +14,7 @@ Author: Professional Risk Management System
 
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Tuple, Optional
 import numpy as np
 from collections import deque
@@ -274,7 +274,7 @@ class EmergencyRiskManager:
         
         # Update drawdown
         current_balance = get_account_balance()
-        if current_balance > self.peak_balance:
+        if current_balance is not None and current_balance > self.peak_balance:
             self.peak_balance = current_balance
         
         drawdown = (self.peak_balance - current_balance) / self.peak_balance
@@ -370,10 +370,10 @@ class EmergencyRiskManager:
         Calculate REAL daily P&L from database trades
         This is the bulletproof method that actually queries the database
         """
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         
         # Get start of current trading day (00:00 UTC)
-        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         
         try:
             # Query all trades for today

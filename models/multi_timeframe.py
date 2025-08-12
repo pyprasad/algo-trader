@@ -18,7 +18,7 @@ Author: Enhanced Algo Trading System
 
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Tuple
 from data.db import db, sanitize_collection_name
 from models.rsi import compute_rsi
@@ -81,7 +81,7 @@ class TimeframeResampler:
         multiplier = timeframe_multipliers.get(timeframe, 1)
         lookback_minutes = limit * multiplier * 2  # Get extra data for resampling
         
-        since = datetime.utcnow() - timedelta(minutes=lookback_minutes)
+        since = datetime.now(timezone.utc) - timedelta(minutes=lookback_minutes)
         
         # Fetch tick data
         cursor = tick_collection.find(

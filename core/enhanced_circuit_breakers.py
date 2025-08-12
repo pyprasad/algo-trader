@@ -453,7 +453,7 @@ class EnhancedCircuitBreakers:
             current_balance = get_account_balance()
             
             # Update peak balance
-            if current_balance > self.peak_balance:
+            if current_balance is not None and current_balance > self.peak_balance:
                 self.peak_balance = current_balance
             
             # Calculate drawdown
