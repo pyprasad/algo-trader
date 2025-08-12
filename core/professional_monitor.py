@@ -125,7 +125,7 @@ class ProfessionalTradingMonitor:
         elif current_balance is not None and self.peak_balance is not None:
             self.current_drawdown = (self.peak_balance - current_balance) / self.peak_balance if self.peak_balance > 0 else 0.0
             
-        if self.current_drawdown > self.max_drawdown:
+        if self.current_drawdown is not None and self.max_drawdown is not None and self.current_drawdown > self.max_drawdown:
             self.max_drawdown = self.current_drawdown
         
         # Calculate daily P&L
@@ -269,11 +269,11 @@ class ProfessionalTradingMonitor:
         """Check for performance alerts and warnings"""
         
         # Drawdown alerts
-        if self.current_drawdown >= self.DRAWDOWN_CRITICAL:
+        if self.current_drawdown is not None and self.current_drawdown >= self.DRAWDOWN_CRITICAL:
             self._send_alert('CRITICAL_DRAWDOWN', 
                            f'Critical drawdown: {self.current_drawdown:.2%}', 
                            'critical')
-        elif self.current_drawdown >= self.DRAWDOWN_WARNING:
+        elif self.current_drawdown is not None and self.current_drawdown >= self.DRAWDOWN_WARNING:
             self._send_alert('DRAWDOWN_WARNING', 
                            f'Drawdown warning: {self.current_drawdown:.2%}', 
                            'warning')
@@ -289,8 +289,8 @@ class ProfessionalTradingMonitor:
         # Win rate alerts
         if 'win_rate' in self.daily_metrics:
             win_rate = self.daily_metrics['win_rate']
-            total_trades = self.daily_metrics.get('total_trades', 0)
-            if win_rate is not None and total_trades is not None and win_rate < self.MIN_WIN_RATE and total_trades > 10:
+            total_trades = self.daily_metrics.get('total_trades', 0) or 0
+            if win_rate is not None and win_rate < self.MIN_WIN_RATE and total_trades > 10:
                 self._send_alert('LOW_WIN_RATE', 
                                f'Low win rate: {win_rate:.1%}', 
                                'warning')
