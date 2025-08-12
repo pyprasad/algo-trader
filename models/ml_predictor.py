@@ -424,10 +424,15 @@ class MLEnsemblePredictor:
         
     def prepare_enhanced_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Create comprehensive feature set"""
-        # Clean DataFrame - remove any non-numeric columns like ObjectId
+        # Clean DataFrame - remove any non-numeric columns like ObjectId and market name
         df_clean = df.copy()
+        columns_to_drop = []
         if '_id' in df_clean.columns:
-            df_clean = df_clean.drop('_id', axis=1)
+            columns_to_drop.append('_id')
+        if 'market' in df_clean.columns:
+            columns_to_drop.append('market')  # Drop market name string column
+        if columns_to_drop:
+            df_clean = df_clean.drop(columns_to_drop, axis=1)
         
         # Start with existing features
         predictor = MLTradingPredictor()
@@ -464,11 +469,16 @@ class MLEnsemblePredictor:
         if len(ticks) < 1000:
             return {"error": f"Insufficient data: {len(ticks)} < 1000"}
         
-        # Convert to DataFrame (exclude MongoDB _id field)
+        # Convert to DataFrame (exclude MongoDB _id and market fields)
         df = pd.DataFrame(ticks)
-        # Remove MongoDB ObjectId field if present
+        # Remove MongoDB ObjectId field and market string field if present
+        columns_to_drop = []
         if '_id' in df.columns:
-            df = df.drop('_id', axis=1)
+            columns_to_drop.append('_id')
+        if 'market' in df.columns:
+            columns_to_drop.append('market')  # Drop market name string column
+        if columns_to_drop:
+            df = df.drop(columns_to_drop, axis=1)
         df['timestamp'] = pd.to_datetime(df['timestamp'])
         
         # Remove duplicate timestamps before setting index
@@ -560,11 +570,23 @@ class MLEnsemblePredictor:
             return {"error": "Ensemble not trained"}
         
         try:
+            # Validate input
+            if not recent_prices or not isinstance(recent_prices, (list, tuple)):
+                return {"error": f"Invalid prices input: expected list, got {type(recent_prices).__name__}"}
+            
+            # Check if prices are numeric
+            try:
+                numeric_prices = [float(p) for p in recent_prices if p is not None]
+                if len(numeric_prices) < 10:
+                    return {"error": f"Insufficient valid price data: {len(numeric_prices)} prices"}
+            except (TypeError, ValueError) as e:
+                return {"error": f"Invalid price data: {str(e)}"}
+            
             # Create DataFrame from recent prices
             df = pd.DataFrame({
-                'midprice': recent_prices,
-                'bid': recent_prices,  # Approximate
-                'offer': recent_prices  # Approximate
+                'midprice': numeric_prices,
+                'bid': numeric_prices,  # Approximate
+                'offer': numeric_prices  # Approximate
             })
             df.index = pd.date_range(end=datetime.now(), periods=len(recent_prices), freq='1min')
             
@@ -656,6 +678,18 @@ class MLTradingIntegration:
     
     def get_ml_signal(self, market: str, recent_prices: List[float], auto_train: bool = True) -> Dict:
         """Get ML trading signal for market"""
+        # Validate inputs
+        if isinstance(market, (list, tuple)) and isinstance(recent_prices, str):
+            # Arguments are swapped - fix them
+            market, recent_prices = recent_prices, market
+            print(f"⚠️ ML signal: Fixed swapped arguments")
+        
+        if not isinstance(market, str):
+            return {"error": f"Invalid market: expected string, got {type(market).__name__}"}
+        
+        if not isinstance(recent_prices, (list, tuple)):
+            return {"error": f"Invalid prices: expected list, got {type(recent_prices).__name__}"}
+        
         # Auto-train if needed
         if auto_train and self.should_retrain(market):
             print(f"🔄 Auto-training ML models for {market}...")
@@ -693,6 +727,19 @@ def train_ml_models_for_market(market: str, force_retrain: bool = False) -> Dict
 
 def get_ml_trading_signal(market: str, recent_prices: List[float]) -> Dict:
     """Get ML-enhanced trading signal"""
+    # Validate inputs
+    if isinstance(market, (list, tuple)) and isinstance(recent_prices, str):
+        # Arguments are swapped - fix them
+        market, recent_prices = recent_prices, market
+        print(f"⚠️ ML predictor: Fixed swapped arguments")
+    
+    # Additional validation
+    if not isinstance(market, str):
+        return {"error": f"Invalid market type: expected string, got {type(market).__name__}"}
+    
+    if not isinstance(recent_prices, (list, tuple)):
+        return {"error": f"Invalid prices type: expected list, got {type(recent_prices).__name__}"}
+    
     integration = get_ml_integration()
     return integration.get_ml_signal(market, recent_prices)
 

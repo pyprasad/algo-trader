@@ -119,14 +119,15 @@ class ProfessionalTradingMonitor:
             self.peak_balance = current_balance
         
         # Update peak and drawdown
-        if current_balance is not None and self.peak_balance is not None and current_balance > self.peak_balance:
-            self.peak_balance = current_balance
-            self.current_drawdown = 0.0
-        elif current_balance is not None and self.peak_balance is not None:
-            self.current_drawdown = (self.peak_balance - current_balance) / self.peak_balance if self.peak_balance > 0 else 0.0
-            
-        if self.current_drawdown is not None and self.max_drawdown is not None and self.current_drawdown > self.max_drawdown:
-            self.max_drawdown = self.current_drawdown
+        if current_balance is not None and self.peak_balance is not None:
+            if current_balance > self.peak_balance:
+                self.peak_balance = current_balance
+                self.current_drawdown = 0.0
+            else:
+                self.current_drawdown = (self.peak_balance - current_balance) / self.peak_balance if self.peak_balance > 0 else 0.0
+                
+            if self.current_drawdown > self.max_drawdown:
+                self.max_drawdown = self.current_drawdown
         
         # Calculate daily P&L
         today = datetime.now().date()
@@ -138,7 +139,7 @@ class ProfessionalTradingMonitor:
             "status": {"$in": ["CLOSED", "OPEN"]}
         }))
         
-        daily_pnl = sum(trade.get('profit_loss', 0) for trade in daily_trades)
+        daily_pnl = sum((trade.get('profit_loss') or 0) for trade in daily_trades)
         
         # Update performance history
         self.performance_history.append({
@@ -221,7 +222,7 @@ class ProfessionalTradingMonitor:
                 'timestamp': trade.get('timestamp'),
                 'market': trade.get('market'),
                 'score': quality_score,
-                'pnl': trade.get('profit_loss', 0)
+                'pnl': trade.get('profit_loss') or 0
             })
     
     def _calculate_trade_quality_score(self, trade: Dict) -> float:
@@ -238,7 +239,7 @@ class ProfessionalTradingMonitor:
         # Factor 1: Risk-reward ratio
         entry_price = trade.get('entry_price', 0)
         stop_loss = trade.get('stop_loss', 0)
-        profit_loss = trade.get('profit_loss', 0)
+        profit_loss = trade.get('profit_loss') or 0
         
         if entry_price and stop_loss and entry_price != 0 and stop_loss != 0:
             risk_amount = abs(entry_price - stop_loss) * trade.get('size', 1)
@@ -406,8 +407,8 @@ class ProfessionalTradingMonitor:
             "status": "CLOSED"
         }))
         
-        winners = [t for t in recent_trades if t.get('profit_loss') is not None and t.get('profit_loss', 0) > 0]
-        losers = [t for t in recent_trades if t.get('profit_loss') is not None and t.get('profit_loss', 0) < 0]
+        winners = [t for t in recent_trades if t.get('profit_loss') and t.get('profit_loss') > 0]
+        losers = [t for t in recent_trades if t.get('profit_loss') and t.get('profit_loss') < 0]
         
         return {
             'account_balance': current_balance,
@@ -421,8 +422,8 @@ class ProfessionalTradingMonitor:
             'total_trades': len(recent_trades),
             'winning_trades': len(winners),
             'losing_trades': len(losers),
-            'avg_win': np.mean([t['profit_loss'] for t in winners if t.get('profit_loss') is not None]) if winners else 0,
-            'avg_loss': np.mean([t['profit_loss'] for t in losers if t.get('profit_loss') is not None]) if losers else 0,
+            'avg_win': np.mean([t.get('profit_loss', 0) for t in winners if t.get('profit_loss')]) if winners else 0,
+            'avg_loss': np.mean([t.get('profit_loss', 0) for t in losers if t.get('profit_loss')]) if losers else 0,
             'avg_trade_quality': np.mean([s['score'] for s in self.trade_quality_scores]) if self.trade_quality_scores else 0.5,
             'monitoring_active': self.monitoring_active
         }
