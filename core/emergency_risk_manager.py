@@ -38,17 +38,20 @@ class EmergencyRiskManager:
     def __init__(self):
         """Initialize emergency risk management system"""
         
-        # CRITICAL RISK PARAMETERS - CONSERVATIVE SETTINGS
-        self.MAX_LOSS_PER_TRADE = 0.02  # 2% maximum loss per trade
-        self.DAILY_LOSS_LIMIT = 0.05    # 5% daily loss limit
-        self.MAX_POSITION_SIZE = 0.01   # 1% max position size (reduced from 2%)
-        self.MAX_TOTAL_EXPOSURE = 0.10  # 10% maximum total exposure
-        self.MAX_CONSECUTIVE_LOSSES = 5  # Stop after 5 consecutive losses
-        self.MAX_CORRELATION_EXPOSURE = 0.03  # 3% max exposure to correlated markets
+        # Load risk parameters from config
+        emergency_config = config.get('professional_trading', {}).get('emergency_risk', {})
+        
+        # CRITICAL RISK PARAMETERS - From config with defaults
+        self.MAX_LOSS_PER_TRADE = emergency_config.get('max_loss_per_trade', 0.05)
+        self.DAILY_LOSS_LIMIT = emergency_config.get('daily_loss_limit', 0.10)
+        self.MAX_POSITION_SIZE = emergency_config.get('max_position_size', 0.10)
+        self.MAX_TOTAL_EXPOSURE = emergency_config.get('max_total_exposure', 0.20)
+        self.MAX_CONSECUTIVE_LOSSES = emergency_config.get('max_consecutive_losses', 5)
+        self.MAX_CORRELATION_EXPOSURE = emergency_config.get('max_correlation_exposure', 0.03)
         
         # Volatility thresholds
-        self.HIGH_VOLATILITY_THRESHOLD = 0.03  # 3% volatility = high
-        self.EXTREME_VOLATILITY_THRESHOLD = 0.05  # 5% volatility = extreme
+        self.HIGH_VOLATILITY_THRESHOLD = emergency_config.get('high_volatility_threshold', 0.03)
+        self.EXTREME_VOLATILITY_THRESHOLD = emergency_config.get('extreme_volatility_threshold', 0.05)
         
         # Trading state
         self.trading_halted = False
@@ -104,7 +107,10 @@ class EmergencyRiskManager:
         account_balance = get_account_balance()
         
         # 1. CHECK POSITION SIZE LIMIT
-        position_value = size * current_price
+        # For Spread Betting, size is in £ per point, not full contract value
+        # Maximum risk is size * max expected movement (e.g., 100 points)
+        max_expected_movement = 100  # Typical daily range for indices
+        position_value = size * max_expected_movement  # Maximum exposure
         position_percentage = position_value / account_balance
         
         if position_percentage > self.MAX_POSITION_SIZE:

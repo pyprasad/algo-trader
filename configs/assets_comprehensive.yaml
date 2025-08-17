@@ -3,6 +3,8 @@
   epic: "IX.D.FTSE.DAILY.IP"
   trade_size: 1
   min_stop_distance: 1
+  stop_loss: 5
+  take_profit: 10
   currency: "GBP"
   market_hours:
     open: "08:00"
@@ -39,7 +41,9 @@
   epic: "IX.D.DAX.DAILY.IP"
   trade_size: 1
   min_stop_distance: 2
-  currency: "EUR"
+  stop_loss: 8
+  take_profit: 12
+  currency: "GBP"
   market_hours:
     open: "08:00"
     close: "16:30"

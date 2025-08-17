@@ -163,7 +163,12 @@ class ProfessionalTradingMonitor:
             return
         
         # Get returns series
-        balances = [p['balance'] for p in self.performance_history]
+        balances = [p['balance'] for p in self.performance_history if p['balance'] is not None]
+        
+        # Skip calculation if we don't have enough valid data
+        if len(balances) < 2:
+            return
+            
         # Ensure no division by zero
         balances_array = np.array(balances[:-1])
         balances_array[balances_array == 0] = 1e-10  # Replace zeros with small value
@@ -191,7 +196,7 @@ class ProfessionalTradingMonitor:
         }))
         
         if recent_trades:
-            winners = [t for t in recent_trades if t['profit_loss'] > 0]
+            winners = [t for t in recent_trades if t.get('profit_loss') is not None and t['profit_loss'] > 0]
             win_rate = len(winners) / len(recent_trades)
         else:
             win_rate = 0.5
@@ -407,8 +412,8 @@ class ProfessionalTradingMonitor:
             "status": "CLOSED"
         }))
         
-        winners = [t for t in recent_trades if t.get('profit_loss') and t.get('profit_loss') > 0]
-        losers = [t for t in recent_trades if t.get('profit_loss') and t.get('profit_loss') < 0]
+        winners = [t for t in recent_trades if t.get('profit_loss') is not None and t.get('profit_loss') > 0]
+        losers = [t for t in recent_trades if t.get('profit_loss') is not None and t.get('profit_loss') < 0]
         
         return {
             'account_balance': current_balance,

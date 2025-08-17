@@ -3,95 +3,88 @@
 
 market_strategies:
   "DAX":
-    # More conservative parameters for high volatility DAX
+    # Simplified parameters for better trade execution
     rsi_period: 14
-    rsi_buy_threshold: 75        # Less sensitive (was 70)
-    rsi_sell_threshold: 25       # Less sensitive (was 30)
-    stop_loss_pips: 15           # Wider for DAX volatility (was 10)
-    take_profit_pips: 30         # Better risk/reward 1:2 (was 20)
-    min_confidence_threshold: 0.8 # Higher confidence required (was 0.7)
+    rsi_buy_threshold: 35        # Buy on oversold (mean reversion)
+    rsi_sell_threshold: 65       # Sell on overbought (mean reversion)
+    stop_loss_pips: 8            # Tighter stop for more trades
+    take_profit_pips: 12         # Achievable target
+    min_confidence_threshold: 0.55 # Lower threshold for more opportunities
     
-    # DAX-specific risk management
+    # DAX-specific risk management (loosened)
     emergency_protection:
-      max_consecutive_losses: 3   # Stop after 3 consecutive losses
-      daily_loss_limit: 50        # Stop if daily loss > £50
-      cooling_off_hours: 2        # Wait 2 hours after hitting limits
-      reduce_position_size: 0.5   # Use 50% position size due to poor performance
+      max_consecutive_losses: 8   # Allow more losses before stopping
+      daily_loss_limit: 200       # Higher limit for testing
+      cooling_off_hours: 0.5      # Shorter cooling period
+      reduce_position_size: 1.0   # Full position size
     
-    # Time-based filters (avoid high volatility periods)
+    # Time-based filters (removed for more opportunities)
     trading_hours:
-      avoid_hours: [19, 20, 21, 22]  # Avoid 19:00 (worst performance)
-      preferred_hours: [8, 9, 10, 14, 15, 16]  # European session
+      avoid_hours: []             # Trade all hours
+      preferred_hours: []         # No preference
       
     # Volatility filters
     max_atr_multiplier: 1.5      # Don't trade if ATR > 1.5x normal
     volatility_lookback: 20      # Use 20 periods for volatility calc
 
   "FTSE 100":
-    # Keep current parameters (working well - 80% win rate)
+    # Adjusted for standard RSI strategy
     rsi_period: 14
-    rsi_buy_threshold: 70        # Keep current (working)
-    rsi_sell_threshold: 30       # Keep current (working)
-    stop_loss_pips: 10           # Keep current
-    take_profit_pips: 20         # Keep current
-    min_confidence_threshold: 0.7 # Current works well
+    rsi_buy_threshold: 30        # Buy on oversold
+    rsi_sell_threshold: 70       # Sell on overbought
+    stop_loss_pips: 5            # Tighter stop
+    take_profit_pips: 10         # Achievable target
+    min_confidence_threshold: 0.5 # Lower threshold
     
-    # FTSE-specific optimizations
+    # FTSE-specific optimizations (loosened)
     emergency_protection:
-      max_consecutive_losses: 5   # More lenient (good performance)
-      daily_loss_limit: 100       # Higher limit (profitable market)
-      cooling_off_hours: 1        # Shorter cooling off
-      reduce_position_size: 1.0   # Full position size (good performance)
+      max_consecutive_losses: 10  # Very lenient
+      daily_loss_limit: 300       # Higher limit
+      cooling_off_hours: 0.25     # Minimal cooling
+      reduce_position_size: 1.0   # Full position size
     
-    # Time-based filters
+    # Time-based filters (removed for more opportunities)
     trading_hours:
-      avoid_hours: [21, 22, 23, 0, 1, 2, 3, 4, 5, 6, 7]  # After London close
-      preferred_hours: [8, 9, 10, 11, 12, 13, 14, 15, 16]  # London session
+      avoid_hours: []             # Trade all hours
+      preferred_hours: []         # No preference
       
     # Volatility filters
     max_atr_multiplier: 2.0      # More lenient (less volatile than DAX)
     volatility_lookback: 14      # Standard lookback
 
-# Global overrides for immediate protection
+# Global overrides (disabled for testing)
 emergency_global_settings:
-  # Stop all DAX trading if conditions met
+  # Market suspension disabled
   market_suspension:
     "DAX":
-      suspend_if_daily_loss_exceeds: 30
-      suspend_if_win_rate_below: 30  # Suspend if win rate < 30%
-      min_trades_for_suspension: 5   # Need at least 5 trades to calculate
+      suspend_if_daily_loss_exceeds: 9999  # Effectively disabled
+      suspend_if_win_rate_below: 0         # Never suspend
+      min_trades_for_suspension: 999       # Very high threshold
       
-  # Enhanced FTSE trading (it's profitable)
+  # Enhancement settings
   market_enhancement:
     "FTSE 100":
       increase_frequency_if_profitable: true
-      min_profit_for_enhancement: 20  # If daily profit > £20, increase frequency
+      min_profit_for_enhancement: 5         # Lower threshold
 
-# Multi-timeframe confirmation requirements
+# Multi-timeframe confirmation requirements (simplified)
 timeframe_analysis:
   "DAX":
-    require_timeframes: ["5M", "15M", "1H"]  # All must align
-    minimum_aligned_timeframes: 3            # All 3 must agree
+    require_timeframes: ["5M"]               # Single timeframe
+    minimum_aligned_timeframes: 1            # Just one needed
     
   "FTSE 100": 
-    require_timeframes: ["5M", "15M"]        # Less strict (working well)
-    minimum_aligned_timeframes: 2            # Both must agree
+    require_timeframes: ["5M"]               # Single timeframe
+    minimum_aligned_timeframes: 1            # Just one needed
 
-# News/Event filters (DAX sensitive to European news)
+# News/Event filters (disabled for testing)
 news_sensitivity:
   "DAX":
-    avoid_trading_minutes_before_news: 30    # Avoid 30 min before major news
-    avoid_trading_minutes_after_news: 60     # Avoid 60 min after major news
-    major_news_events:
-      - "ECB_ANNOUNCEMENT"
-      - "GERMAN_GDP"
-      - "EUROPEAN_PMI"
-      - "FOMC_MEETING"
+    avoid_trading_minutes_before_news: 0     # No avoidance
+    avoid_trading_minutes_after_news: 0      # No avoidance
+    major_news_events: []                    # Ignore all news
       
   "FTSE 100":
-    avoid_trading_minutes_before_news: 15    # Less sensitive
-    avoid_trading_minutes_after_news: 30     # Less sensitive
-    major_news_events:
-      - "BOE_ANNOUNCEMENT"
-      - "UK_GDP"
-      - "UK_INFLATION"
+    avoid_trading_minutes_before_news: 0     # No avoidance
+    avoid_trading_minutes_after_news: 0      # No avoidance
+    major_news_events: []                    # Ignore all news

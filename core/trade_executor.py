@@ -166,13 +166,35 @@ def execute_trade(market_name, direction, strategy_sl=10, strategy_tp=20, strate
     # CHECKPOINT 2: Emergency Risk Management (Bulletproof)  
     print("🔒 CHECKPOINT 2: EMERGENCY RISK VALIDATION")
     try:
+        # Calculate stop loss if not provided by strategy
+        current_price = strategy_signals.get('price', 0) if strategy_signals else 0
+        stop_loss_for_validation = strategy_signals.get('stop_loss') if strategy_signals else None
+        
+        if stop_loss_for_validation is None:
+            # Use market-specific stop loss from config
+            try:
+                asset_config = load_asset_config(market_name)
+                stop_loss_pips = asset_config.get('stop_loss', 10)  # Default 10 pips
+                
+                if current_price > 0:
+                    if direction == "BUY":
+                        stop_loss_for_validation = current_price - stop_loss_pips
+                    else:
+                        stop_loss_for_validation = current_price + stop_loss_pips
+                else:
+                    # Fallback: use a reasonable default stop loss for validation only
+                    stop_loss_for_validation = 100  # Placeholder value for validation
+            except Exception as e:
+                print(f"⚠️ Error loading asset config: {e}")
+                stop_loss_for_validation = 100  # Fallback value
+        
         # Force real-time risk validation
         can_trade, risk_reason = risk_manager.validate_trade(
             market=market_name,
             direction=direction,
             size=1,  # Temporary size for validation
-            current_price=strategy_signals.get('price', 0) if strategy_signals else 0,
-            stop_loss=strategy_signals.get('stop_loss') if strategy_signals else None
+            current_price=current_price,
+            stop_loss=stop_loss_for_validation
         )
         
         if not can_trade:

@@ -136,6 +136,11 @@ class DynamicPositionSizer:
         recommended_method = self.DEFAULT_METHOD
         recommended_size = size_calculations[recommended_method]
         
+        # Convert to Spread Betting sizing (IG uses £/point)
+        # For indices like FTSE/DAX, we specify £ per point movement
+        # Typical sizing: £1-10 per point for retail traders
+        recommended_size = min(recommended_size, 10.0)  # Cap at £10 per point
+        
         # Apply constraints
         max_size_by_risk = (account_balance * self.MAX_RISK_PER_TRADE) / risk_per_unit
         max_size_by_position = account_balance * self.MAX_POSITION_SIZE / current_price

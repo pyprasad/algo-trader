@@ -21,7 +21,7 @@ strategy:
 dynamic_limits:
   enabled: true
   update_interval_seconds: 30
-  confidence_threshold: 0.7
+  confidence_threshold: 0.5
   max_limit_increase: 2.0
   min_limit_decrease: 0.5
   pnl_threshold_percent: 5.0
@@ -34,7 +34,7 @@ dynamic_limits:
     emergency_stop_multiplier: 0.7
     adverse_signal_close: true
 sentiment_analysis:
-  enabled: true
+  enabled: false
   check_interval_minutes: 60
   respect_market_hours: true
   markets:
@@ -57,10 +57,10 @@ sentiment_analysis:
     skip_weekends: true
 professional_trading:
   enabled: true
-  system_mode: moderate
+  system_mode: aggressive
   # 🏦 Smart Money Concepts Configuration (NEW!)
   smart_money:
-    enabled: true
+    enabled: false
     min_confidence: 0.6
     lookback_periods: 50
     min_block_strength: 2.0
@@ -78,7 +78,7 @@ professional_trading:
       swing_detection: true
   # 🧠 Advanced ML Configuration (NEW!)
   advanced_ml:
-    enabled: true
+    enabled: false
     model_type: ensemble  # lstm, transformer, or ensemble
     confidence_threshold: 0.7
     sequence_length: 50
@@ -141,7 +141,7 @@ professional_trading:
       daily_loss_limit: 300
       trade_frequency: medium
     aggressive:
-      min_signal_confidence: 0.6
+      min_signal_confidence: 0.5
       analysis_interval_minutes: 2
       max_trades_per_hour: 3
       daily_loss_limit: 500
@@ -152,16 +152,16 @@ professional_trading:
       max_trades_per_hour: 2
       daily_loss_limit: 250
   emergency_risk:
-    max_loss_per_trade: 0.02
-    daily_loss_limit: 0.05
-    max_position_size: 0.01
-    max_total_exposure: 0.1
+    max_loss_per_trade: 0.05
+    daily_loss_limit: 0.10
+    max_position_size: 0.10
+    max_total_exposure: 0.20
     max_consecutive_losses: 5
     max_correlation_exposure: 0.03
     high_volatility_threshold: 0.03
     extreme_volatility_threshold: 0.05
   strategy:
-    min_signal_strength: 0.6
+    min_signal_strength: 0.4
     trend_confirmation_required: true
     rsi_adaptive_enabled: true
     timeframe_weights:
@@ -181,7 +181,7 @@ professional_trading:
 
 # 📅 Economic Calendar Configuration
 economic_calendar:
-  enabled: true
+  enabled: false
   update_interval_hours: 6
   
   # Data sources configuration
