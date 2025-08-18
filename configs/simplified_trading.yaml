@@ -1,0 +1,95 @@
+# SIMPLIFIED TRADING CONFIGURATION
+# This configuration is designed to actually place trades
+
+market_strategies:
+  "DAX":
+    # More aggressive RSI settings for more trades
+    rsi_period: 10              # Shorter period for faster signals
+    rsi_buy_threshold: 40        # Less extreme threshold
+    rsi_sell_threshold: 60       # Less extreme threshold
+    stop_loss_pips: 15           # Reasonable stop loss
+    take_profit_pips: 20         # Achievable profit target
+    min_confidence_threshold: 0.3  # Very low threshold to allow trades
+    
+    # Minimal risk management
+    emergency_protection:
+      max_consecutive_losses: 20    # Very high tolerance
+      daily_loss_limit: 500         # High limit
+      cooling_off_hours: 0          # No cooling period
+      reduce_position_size: 1.0     # Always full size
+    
+    # No time restrictions
+    trading_hours:
+      avoid_hours: []
+      preferred_hours: []
+      
+    # Minimal volatility filter
+    max_atr_multiplier: 5.0        # Very high tolerance
+    volatility_lookback: 10        # Short lookback
+
+  "FTSE 100":
+    # More aggressive RSI settings
+    rsi_period: 10              # Shorter period
+    rsi_buy_threshold: 40        # Less extreme
+    rsi_sell_threshold: 60       # Less extreme
+    stop_loss_pips: 10           # Reasonable stop
+    take_profit_pips: 15         # Achievable target
+    min_confidence_threshold: 0.3  # Very low threshold
+    
+    # Minimal risk management
+    emergency_protection:
+      max_consecutive_losses: 20    # Very high tolerance
+      daily_loss_limit: 500         # High limit
+      cooling_off_hours: 0          # No cooling
+      reduce_position_size: 1.0     # Always full size
+    
+    # No time restrictions
+    trading_hours:
+      avoid_hours: []
+      preferred_hours: []
+      
+    # Minimal volatility filter
+    max_atr_multiplier: 5.0        # Very high tolerance
+    volatility_lookback: 10        # Short lookback
+
+# Disable all emergency settings
+emergency_global_settings:
+  market_suspension:
+    "DAX":
+      suspend_if_daily_loss_exceeds: 99999
+      suspend_if_win_rate_below: 0
+      min_trades_for_suspension: 99999
+    "FTSE 100":
+      suspend_if_daily_loss_exceeds: 99999
+      suspend_if_win_rate_below: 0
+      min_trades_for_suspension: 99999
+      
+  market_enhancement:
+    "FTSE 100":
+      increase_frequency_if_profitable: false
+      min_profit_for_enhancement: 999999
+    "DAX":
+      increase_frequency_if_profitable: false
+      min_profit_for_enhancement: 999999
+
+# Single timeframe only
+timeframe_analysis:
+  "DAX":
+    require_timeframes: ["5M"]
+    minimum_aligned_timeframes: 1
+    
+  "FTSE 100": 
+    require_timeframes: ["5M"]
+    minimum_aligned_timeframes: 1
+
+# No news filtering
+news_sensitivity:
+  "DAX":
+    avoid_trading_minutes_before_news: 0
+    avoid_trading_minutes_after_news: 0
+    major_news_events: []
+      
+  "FTSE 100":
+    avoid_trading_minutes_before_news: 0
+    avoid_trading_minutes_after_news: 0
+    major_news_events: []

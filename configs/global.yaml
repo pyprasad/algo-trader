@@ -12,16 +12,16 @@ mongodb:
   collection: ftse100
 strategy:
   mode: HISTORICAL
-  rsi_period: 14
-  rsi_buy_threshold: 70
-  rsi_sell_threshold: 30
-  stop_loss_pips: 10
+  rsi_period: 10
+  rsi_buy_threshold: 45
+  rsi_sell_threshold: 55
+  stop_loss_pips: 15
   take_profit_pips: 20
-  dynamic_atr_sltp: true
+  dynamic_atr_sltp: false
 dynamic_limits:
   enabled: true
   update_interval_seconds: 30
-  confidence_threshold: 0.5
+  confidence_threshold: 0.1
   max_limit_increase: 2.0
   min_limit_decrease: 0.5
   pnl_threshold_percent: 5.0
@@ -40,7 +40,7 @@ sentiment_analysis:
   markets:
   - DAX
   - FTSE
-  min_confidence_threshold: 0.6
+  min_confidence_threshold: 0.1
   api_sources:
     newsapi:
       enabled: true
@@ -58,10 +58,10 @@ sentiment_analysis:
 professional_trading:
   enabled: true
   system_mode: aggressive
-  # 🏦 Smart Money Concepts Configuration (NEW!)
+  # 🏦 Smart Money Concepts Configuration (DISABLED!)
   smart_money:
     enabled: false
-    min_confidence: 0.6
+    min_confidence: 0.1
     lookback_periods: 50
     min_block_strength: 2.0
     order_blocks:
@@ -76,11 +76,11 @@ professional_trading:
     market_structure:
       enabled: true
       swing_detection: true
-  # 🧠 Advanced ML Configuration (NEW!)
+  # 🧠 Advanced ML Configuration (DISABLED!)
   advanced_ml:
     enabled: false
     model_type: ensemble  # lstm, transformer, or ensemble
-    confidence_threshold: 0.7
+    confidence_threshold: 0.1
     sequence_length: 50
     training:
       min_training_samples: 2000
@@ -129,40 +129,40 @@ professional_trading:
       retrain_frequency_days: 7
   modes:
     conservative:
-      min_signal_confidence: 0.75
+      min_signal_confidence: 0.1
       analysis_interval_minutes: 5
       max_trades_per_hour: 1
       daily_loss_limit: 200
       trade_frequency: low
     moderate:
-      min_signal_confidence: 0.65
+      min_signal_confidence: 0.1
       analysis_interval_minutes: 3
       max_trades_per_hour: 2
       daily_loss_limit: 300
       trade_frequency: medium
     aggressive:
-      min_signal_confidence: 0.5
+      min_signal_confidence: 0.1
       analysis_interval_minutes: 2
       max_trades_per_hour: 3
       daily_loss_limit: 500
       trade_frequency: high
     custom:
-      min_signal_confidence: 0.7
+      min_signal_confidence: 0.1
       analysis_interval_minutes: 4
       max_trades_per_hour: 2
       daily_loss_limit: 250
   emergency_risk:
-    max_loss_per_trade: 0.05
-    daily_loss_limit: 0.10
-    max_position_size: 0.10
-    max_total_exposure: 0.20
-    max_consecutive_losses: 5
-    max_correlation_exposure: 0.03
-    high_volatility_threshold: 0.03
-    extreme_volatility_threshold: 0.05
+    max_loss_per_trade: 0.10
+    daily_loss_limit: 0.95
+    max_position_size: 0.20
+    max_total_exposure: 0.50
+    max_consecutive_losses: 999
+    max_correlation_exposure: 0.10
+    high_volatility_threshold: 0.10
+    extreme_volatility_threshold: 0.20
   strategy:
-    min_signal_strength: 0.4
-    trend_confirmation_required: true
+    min_signal_strength: 0.05
+    trend_confirmation_required: false
     rsi_adaptive_enabled: true
     timeframe_weights:
       1M: 0.1

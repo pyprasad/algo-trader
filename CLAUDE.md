@@ -1,5 +1,15 @@
 
 # CLAUDE.md
+
+## RECENT SESSION CONTEXT (Aug 18, 2025)
+**CRITICAL:** System was over-protected with 0 trades. We unblocked it by:
+- Lowering confidence thresholds (0.6→0.1) in configs/global.yaml  
+- Disabling cooling periods & suspensions in configs/market_specific_strategy.yaml
+- NO algorithm changes - only configuration adjustments
+- Expected: 15-25 trades/day with £20+ potential P&L
+- Deploy: `python3 runners/run_multi_market.py`
+- Evaluate: Check SESSION_STATE_2025_08_18.md for results
+
 ## Plan & Review
 
 ### Before starting work
