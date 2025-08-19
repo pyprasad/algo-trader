@@ -108,30 +108,30 @@ class EmergencyRiskManager:
         
         # 1. CHECK POSITION SIZE LIMIT
         # For Spread Betting, size is in £ per point, not full contract value
-        # Maximum risk is size * max expected movement (e.g., 100 points)
-        max_expected_movement = 100  # Typical daily range for indices
-        position_value = size * max_expected_movement  # Maximum exposure
+        # Calculate actual risk based on stop loss
+        if stop_loss is None:
+            return False, "CRITICAL: All trades must have stop loss defined"
+        
+        # Calculate potential loss (this is the actual risk/exposure)
+        if direction == "BUY":
+            potential_loss = abs(current_price - stop_loss) * size
+        else:  # SELL
+            potential_loss = abs(stop_loss - current_price) * size
+        
+        # Use potential loss as position value for spread betting
+        position_value = potential_loss
         position_percentage = position_value / account_balance
         
         if position_percentage > self.MAX_POSITION_SIZE:
             return False, f"Position size {position_percentage:.2%} exceeds limit {self.MAX_POSITION_SIZE:.2%}"
         
-        # 2. CHECK STOP LOSS REQUIREMENT
-        if stop_loss is None:
-            return False, "CRITICAL: All trades must have stop loss defined"
-        
-        # Calculate potential loss
-        if direction == "BUY":
-            potential_loss = (current_price - stop_loss) * size
-        else:  # SELL
-            potential_loss = (stop_loss - current_price) * size
-        
+        # 2. CHECK MAX LOSS PER TRADE
         loss_percentage = potential_loss / account_balance
         
         if loss_percentage > self.MAX_LOSS_PER_TRADE:
             return False, f"Potential loss {loss_percentage:.2%} exceeds limit {self.MAX_LOSS_PER_TRADE:.2%}"
         
-        # 3. CHECK TOTAL EXPOSURE
+        # 3. CHECK TOTAL EXPOSURE (sum of all position risks)
         total_exposure = sum(pos['value'] for pos in self.active_positions.values())
         new_total_exposure = total_exposure + position_value
         exposure_percentage = new_total_exposure / account_balance
@@ -349,13 +349,15 @@ class EmergencyRiskManager:
     def add_position(self, position_id: str, market: str, size: float, 
                     entry_price: float, stop_loss: float):
         """Add a position to tracking"""
+        # For spread betting, the actual exposure is the maximum loss, not size * price
+        max_loss = abs(entry_price - stop_loss) * size
         self.active_positions[position_id] = {
             'market': market,
             'size': size,
             'entry_price': entry_price,
             'stop_loss': stop_loss,
-            'value': size * entry_price,
-            'max_loss': abs(entry_price - stop_loss) * size
+            'value': max_loss,  # Changed: Use max loss as the position value for spread betting
+            'max_loss': max_loss
         }
     
     def remove_position(self, position_id: str, exit_price: float = None):
@@ -395,6 +397,9 @@ class EmergencyRiskManager:
             
             for trade in daily_trades:
                 pnl = trade.get('profit_loss', 0)
+                # Handle None values
+                if pnl is None:
+                    pnl = 0
                 if pnl != 0:  # Only count trades with actual P&L
                     total_pnl += pnl
                     if pnl > 0:

@@ -174,18 +174,23 @@ class MultiMarketTradingSystem:
                             print(f"✅ {market_name} Safety checks passed - Executing trade")
                             
                             # Execute trade with global balance checking
+                            # Safely get ATR value, handling None
+                            atr_value = signals.get('atr')
+                            if atr_value is None:
+                                atr_value = 10  # Default ATR if not available
+                            
                             trade_result = execute_trade(
                                 market_name=market_name,
                                 direction=signals['signal'],
-                                strategy_sl=signals.get('atr', 10),
-                                strategy_tp=signals.get('atr', 20) * 2,
+                                strategy_sl=atr_value,
+                                strategy_tp=atr_value * 2,
                                 strategy_signals=signals
                             )
                             
                             if 'error' in trade_result:
                                 print(f"❌ {market_name} Trade failed: {trade_result['error']}")
-                                # Record failed trade for adaptive strategy
-                                self.market_adaptive_strategy.record_trade_result(market_name, -5.0)  # Assume small loss for failed trades
+                                # DO NOT record failed/blocked trades as losses - they are not executed trades
+                                # Only record actual executed trades with real P&L
                             else:
                                 print(f"✅ {market_name} Trade executed: {trade_result.get('dealStatus', 'Unknown')}")
                                 # Trade success will be recorded when streaming confirms P&L
