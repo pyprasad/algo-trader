@@ -43,10 +43,10 @@ class DynamicPositionSizer:
     def __init__(self):
         """Initialize position sizer with conservative defaults"""
         
-        # RISK PARAMETERS - Conservative institutional settings
-        self.MAX_RISK_PER_TRADE = 0.01      # 1% max risk per trade
-        self.MAX_POSITION_SIZE = 0.02       # 2% max position size  
-        self.MAX_TOTAL_EXPOSURE = 0.10      # 10% max total exposure
+        # RISK PARAMETERS - Updated for spread betting
+        self.MAX_RISK_PER_TRADE = 0.05      # 5% max risk per trade
+        self.MAX_POSITION_SIZE = 10.0       # £10 max per point for spread betting
+        self.MAX_TOTAL_EXPOSURE = 0.20      # 20% max total exposure
         self.MIN_KELLY_FRACTION = 0.001     # Minimum Kelly fraction
         self.MAX_KELLY_FRACTION = 0.025     # Maximum Kelly fraction (cap at 2.5%)
         self.VOLATILITY_SCALING_FACTOR = 2.0 # Scale position inverse to volatility
@@ -141,9 +141,9 @@ class DynamicPositionSizer:
         # Typical sizing: £1-10 per point for retail traders
         recommended_size = min(recommended_size, 10.0)  # Cap at £10 per point
         
-        # Apply constraints
+        # Apply constraints for spread betting
         max_size_by_risk = (account_balance * self.MAX_RISK_PER_TRADE) / risk_per_unit
-        max_size_by_position = account_balance * self.MAX_POSITION_SIZE / current_price
+        max_size_by_position = self.MAX_POSITION_SIZE  # Direct £ per point limit for spread betting
         max_size_by_exposure = self._calculate_max_size_by_exposure(account_balance, current_price)
         
         max_size = min(max_size_by_risk, max_size_by_position, max_size_by_exposure)
@@ -263,7 +263,8 @@ class DynamicPositionSizer:
         if remaining_exposure <= 0:
             return 0
         
-        max_size_by_exposure = remaining_exposure / current_price
+        # For spread betting, exposure is limited by £ per point, not total notional
+        max_size_by_exposure = min(10.0, remaining_exposure / 1000)  # Conservative £10 max per point
         
         print(f"   Exposure limits: Current: £{current_exposure:.2f}, Max: £{max_total_exposure:.2f}")
         print(f"   Remaining exposure: £{remaining_exposure:.2f}")

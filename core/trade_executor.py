@@ -404,7 +404,7 @@ def execute_trade(market_name, direction, strategy_sl=10, strategy_tp=20, strate
     trade_size = trade_size * position_multiplier  # Apply to professionally calculated size
     
     print(f"📏 Final Position Sizing:")
-    print(f"   Professional base: {safe_position_size:.2f}")
+    print(f"   Professional base: {position_size_result.recommended_size:.2f}")
     print(f"   Session multiplier: {position_multiplier:.1f}")
     print(f"   Final size: {trade_size:.2f}")
     
