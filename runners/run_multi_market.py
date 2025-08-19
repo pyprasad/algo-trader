@@ -13,6 +13,7 @@ from data.multi_market_collector import MultiMarketCollector
 from core.enhanced_strategy_engine import get_enhanced_strategy_engine
 from core.market_adaptive_strategy import get_market_adaptive_strategy
 from core.trade_executor import execute_trade
+from core.startup_validator import get_startup_validator
 from data.db import get_market_tick_data, get_available_markets, get_account_balance, get_trade_lifecycle_status, sync_trade_statuses_with_ig
 from data.account_streamer import start_account_streaming, stop_account_streaming, get_live_account_data
 from data.trade_streamer import start_trade_streaming, stop_trade_streaming, get_live_active_trades
@@ -70,6 +71,11 @@ class MultiMarketTradingSystem:
         # Initialize dynamic position manager
         self.dynamic_position_manager = get_dynamic_position_manager()
         print("🚀 Dynamic position manager initialized")
+        
+        # Initialize startup validator
+        self.startup_validator = get_startup_validator()
+        self.startup_validation_complete = False
+        self.startup_validation_report = None
         
         # Initialize sentiment analysis engine
         self.sentiment_engine = get_sentiment_engine()
@@ -165,6 +171,12 @@ class MultiMarketTradingSystem:
                     if signals.get('signal') in ['BUY', 'SELL']:
                         print(f"🎯 {market_name} TRADING SIGNAL: {signals['signal']}")
                         
+                        # CRITICAL: Check startup validation first
+                        if not self.startup_validation_complete:
+                            print(f"🛡️ {market_name} Trade blocked: Startup validation not complete")
+                            print("   💡 System is still validating data quality and readiness")
+                            continue
+                        
                         # SAFETY CHECK: Validate trade before execution
                         can_trade, safety_reason = self.safety_manager.validate_trade(market_name, signals['signal'])
                         
@@ -203,6 +215,10 @@ class MultiMarketTradingSystem:
                 system_config = self.config_loader.get_system_config()
                 analysis_interval = system_config.get('analysis_interval_seconds', 60)
                 time.sleep(analysis_interval)
+                
+                # If startup validation failed, periodically re-check
+                if not self.startup_validation_complete:
+                    self._periodic_validation_check(market_name)
                 
             except Exception as e:
                 print(f"❌ Error analyzing {market_name}: {e}")
@@ -259,6 +275,26 @@ class MultiMarketTradingSystem:
         print(f"⏳ Waiting {data_timeout}s for initial tick data...")
         time.sleep(data_timeout)
         
+        # CRITICAL: Perform startup validation before allowing any trades
+        print("\n🛡️ Performing startup validation before trading...")
+        startup_ready, validation_report = self.startup_validator.validate_startup_readiness(self.markets)
+        self.startup_validation_report = validation_report
+        
+        if not startup_ready:
+            print("❌ STARTUP VALIDATION FAILED - TRADING BLOCKED")
+            print("📋 Validation report:")
+            for check in validation_report['checks_failed']:
+                print(f"   ❌ {check}")
+            for rec in validation_report.get('recommendations', []):
+                print(f"   💡 Recommendation: {rec}")
+            
+            # Block trading by setting validation flag
+            self.startup_validation_complete = False
+            print("⚠️ System will continue data collection but block all trading until validation passes")
+        else:
+            print("✅ STARTUP VALIDATION PASSED - TRADING ENABLED")
+            self.startup_validation_complete = True
+        
         # Start strategy analysis for each market in separate threads
         for market in self.markets:
             self.executor.submit(self.analyze_market_signals, market)
@@ -301,6 +337,30 @@ class MultiMarketTradingSystem:
         print("   📊 Performance monitoring: ACTIVE")
         print("   📅 Economic calendar monitoring: ACTIVE")
         print("   🚨 Circuit breakers: ACTIVE")
+        
+    def _periodic_validation_check(self, market_name: str):
+        """Periodically re-check startup validation if it initially failed"""
+        try:
+            # Only re-validate every 10 cycles to avoid spam
+            if not hasattr(self, '_validation_check_counter'):
+                self._validation_check_counter = {}
+            
+            self._validation_check_counter[market_name] = self._validation_check_counter.get(market_name, 0) + 1
+            
+            if self._validation_check_counter[market_name] % 10 == 0:
+                print(f"🔄 {market_name}: Re-checking startup validation (attempt #{self._validation_check_counter[market_name] // 10})")
+                
+                startup_ready, validation_report = self.startup_validator.validate_startup_readiness(self.markets)
+                
+                if startup_ready:
+                    self.startup_validation_complete = True
+                    self.startup_validation_report = validation_report
+                    print("🎉 STARTUP VALIDATION NOW PASSED - TRADING ENABLED!")
+                else:
+                    print("⚠️ Startup validation still failing - continuing data collection")
+                    
+        except Exception as e:
+            print(f"❌ Error during validation re-check: {e}")
         
     def stop_trading(self):
         """Stop the trading system"""
