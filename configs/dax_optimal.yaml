@@ -1,0 +1,10 @@
+# DAX Optimal Configuration based on analysis
+
+strategy:
+  mode: "HISTORICAL"
+  rsi_period: 14
+  rsi_buy_threshold: 80  # Very conservative for DAX volatility
+  rsi_sell_threshold: 20  # Very conservative for DAX volatility
+  stop_loss_pips: 15     # Reasonable for DAX
+  take_profit_pips: 25   # Good risk/reward
+  dynamic_atr_sltp: true

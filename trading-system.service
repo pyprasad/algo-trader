@@ -1,0 +1,21 @@
+[Unit]
+Description=Algorithmic Trading System
+After=network.target
+
+[Service]
+Type=simple
+User=my
+WorkingDirectory=/Users/my/mayu_solutions/algo-trader
+Environment=PATH=/Users/my/mayu_solutions/algo-trader/venv/bin
+ExecStart=/Users/my/mayu_solutions/algo-trader/venv/bin/python runners/live_trading.py --strategy optimized_rsi
+Restart=always
+RestartSec=10
+
+# Security settings
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/Users/my/mayu_solutions/algo-trader
+
+[Install]
+WantedBy=multi-user.target

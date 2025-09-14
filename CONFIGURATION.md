@@ -2,55 +2,160 @@
 
 ## Overview
 
-The Algo-Trader system uses YAML configuration files for maximum flexibility and ease of management. All configuration files are located in the `configs/` directory with market-specific configurations in `configs/assets/`.
+The Algo-Trader system uses a hybrid configuration approach combining YAML files for non-sensitive settings and environment variables for credentials and sensitive data. This provides maximum flexibility while maintaining security best practices.
 
 ## Configuration Files Structure
 
 ```
 configs/
-├── ig_config.yaml           # IG Markets API credentials
-├── database_config.yaml     # MongoDB connection settings
-├── strategy_config.yaml     # Trading strategy parameters
-├── risk_config.yaml         # Risk management settings
-├── ml_config.yaml          # Machine learning configuration
-├── sentiment_config.yaml    # Sentiment analysis settings
-└── assets/                  # Market-specific configurations
+├── global.yaml              # Main configuration file
+├── assets/                  # Market-specific configurations
     ├── ftse_100.yaml       # FTSE 100 market config
     ├── dax.yaml            # DAX market config
     └── dow_jones.yaml      # Dow Jones market config
+
+# Security - Environment Variables
+.env                         # Credentials and sensitive settings (NOT in version control)
+.env.example                 # Template for .env file
+
+# Core System
+core/
+├── secure_config.py         # Secure configuration management
+├── margin_rate_manager.py   # Margin system configuration
+└── ...
 ```
 
-## Core Configuration Files
+## Configuration Setup
 
-### 1. IG Markets Configuration (`ig_config.yaml`)
+### 1. Environment Variables (`.env`)
+
+**IMPORTANT**: This file contains sensitive credentials and should NEVER be committed to version control.
+
+```bash
+# IG Markets API Credentials
+IG_API_KEY=your_api_key_here
+IG_USERNAME=your_username_here
+IG_PASSWORD=your_password_here
+
+# API Configuration
+IG_BASE_URL=https://demo-api.ig.com/gateway/deal
+IG_SESSION_DURATION=3600
+
+# Database Configuration
+MONGODB_URI=mongodb://127.0.0.1:27017
+MONGODB_DATABASE=ftse100_scalping_bot
+MONGODB_COLLECTION=ftse100
+
+# Feature Flags
+MARGIN_MANAGEMENT_ENABLED=true
+DYNAMIC_LIMITS_ENABLED=true
+EMERGENCY_PROTECTION_ENABLED=true
+
+# Performance Settings
+API_DAILY_LIMIT=800
+CACHE_DURATION_MINUTES=15
+MAX_MARGIN_UTILIZATION=80
+
+# Environment
+ENVIRONMENT=development  # development, staging, production
+LOG_LEVEL=INFO
+```
+
+### 2. Main Configuration (`configs/global.yaml`)
+
+This file contains all non-sensitive configuration settings:
 
 ```yaml
 # IG Markets API Configuration
-ig_service:
-  # Account credentials
-  username: "YOUR_USERNAME"
-  password: "YOUR_PASSWORD"
-  api_key: "YOUR_API_KEY"
-  
-  # Account settings
-  acc_type: "DEMO"  # Options: DEMO, LIVE
-  acc_number: "YOUR_ACCOUNT_NUMBER"
-  
-  # Additional settings
-  lightstreamer_endpoint: "https://demo-apd.marketdatasystems.com"
-  lightstreamer_password: "CST-XXX|XST-XXX"  # Auto-generated on login
+ig:
+  base_url: "https://demo-api.ig.com/gateway/deal"
+  session_duration: 3600  # in seconds
+  cache_file: "session_cache.json"
+  log_file: "ig_streaming.log"
 
-api_config:
-  # API endpoints
-  base_url: "https://demo-api.ig.com/gateway/deal"  # Change for LIVE
-  streaming_url: "https://demo-apd.marketdatasystems.com"
+# MongoDB Configuration
+mongodb:
+  uri: "mongodb://127.0.0.1:27017"
+  database: "ftse100_scalping_bot"
+  collection: "ftse100"
+
+# Trading Strategy Configuration
+strategy:
+  mode: "HISTORICAL"  # or LIVE
+  rsi_period: 14
+  rsi_buy_threshold: 70
+  rsi_sell_threshold: 30
+  stop_loss_pips: 10
+  take_profit_pips: 20
+  dynamic_atr_sltp: true
+
+# Dynamic Position Management
+dynamic_limits:
+  enabled: true
+  update_interval_seconds: 30
+  confidence_threshold: 0.7
+  max_limit_increase: 2.0
+  min_limit_decrease: 0.5
+  pnl_threshold_percent: 5.0
+  strategy_lookback_minutes: 15
   
-  # API version
-  version: "3"
+  # Emergency Capital Protection
+  emergency_protection:
+    enabled: true
+    immediate_loss_threshold: 15
+    rapid_check_interval: 5
+    rapid_check_duration: 300
+    emergency_stop_multiplier: 0.7
+    adverse_signal_close: true
+
+# 🎯 Dynamic Margin Rate Management
+margin_management:
+  enabled: true
   
-  # Request settings
-  timeout: 30  # seconds
-  max_retries: 3
+  # API Usage Optimization
+  api_optimization:
+    daily_request_limit: 800
+    bulk_fetch_hour: 6
+    cache_duration_minutes: 15
+    fallback_to_schedule: true
+    emergency_api_reserve: 50
+  
+  # Default Margin Rates by Asset Class
+  default_rates:
+    forex:
+      market_hours: 0.0333  # 3.33%
+      overnight: 0.05       # 5%
+    indices:
+      market_hours: 0.01    # 1%
+      overnight: 0.02       # 2%
+    commodities:
+      market_hours: 0.05    # 5%
+      overnight: 0.08       # 8%
+    stocks:
+      market_hours: 0.02    # 2%
+      overnight: 0.05       # 5%
+    crypto:
+      market_hours: 0.10    # 10%
+      overnight: 0.10       # 10%
+    weekend_multiplier: 1.5
+    holiday_multiplier: 1.3
+  
+  # Risk Management Integration
+  risk_integration:
+    auto_adjust_position_sizes: true
+    margin_buffer_percent: 10
+    max_margin_utilization: 80
+    margin_call_threshold: 90
+    emergency_close_threshold: 95
+  
+  # Scheduling and Automation
+  scheduler:
+    enabled: true
+    check_interval_minutes: 5
+    preload_window_hours: 24
+    sync_with_market_hours: true
+    weekend_preparation: true
+```
   retry_delay: 5  # seconds
   
   # Rate limiting

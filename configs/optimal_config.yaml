@@ -1,0 +1,130 @@
+# OPTIMAL CONFIGURATION - Based on Timeframe Testing Results
+# This configuration uses the best-performing algorithms and timeframes
+
+# MAIN TRADING CONFIGURATION
+trading:
+  # Optimal timeframes by market (based on test results)
+  optimal_timeframes:
+    'FTSE 100': '10min'  # 10-minute candles with MA Crossover
+    'DAX': '10min'       # 10-minute candles with MA Crossover
+    'default': '10min'   # Default for other markets
+  
+  # Algorithm selection by market
+  optimal_algorithms:
+    'FTSE 100':
+      primary: 'ma_crossover'
+      backup: 'supertrend'
+    'DAX':
+      primary: 'ma_crossover'  # £78 profit on test
+      backup: 'supertrend'     # £7.5 profit on test
+    'default':
+      primary: 'ma_crossover'
+      backup: 'supertrend'
+
+# ALGORITHM PARAMETERS (Optimized)
+algorithms:
+  ma_crossover:
+    'FTSE 100':
+      fast_ma: 5
+      slow_ma: 20
+      stop_loss_pips: 15
+      take_profit_pips: 30
+    'DAX':
+      fast_ma: 5
+      slow_ma: 20  
+      stop_loss_pips: 20  # Higher volatility
+      take_profit_pips: 40
+    'default':
+      fast_ma: 5
+      slow_ma: 20
+      stop_loss_pips: 15
+      take_profit_pips: 30
+      
+  supertrend:
+    'FTSE 100':
+      atr_period: 10
+      multiplier: 2.0
+      stop_loss_atr: 1.5
+      take_profit_atr: 3.0
+    'DAX':
+      atr_period: 10
+      multiplier: 2.0
+      stop_loss_atr: 2.0  # Wider for volatility
+      take_profit_atr: 4.0
+    'default':
+      atr_period: 10
+      multiplier: 2.0
+      stop_loss_atr: 1.5
+      take_profit_atr: 3.0
+
+# RISK MANAGEMENT (Conservative)
+risk_management:
+  # Position sizing
+  position_size_percent: 2.0  # 2% of account per trade
+  max_positions: 2             # Maximum 2 positions at once
+  
+  # Daily limits
+  max_daily_trades: 5          # Limit overtrading
+  max_daily_loss_percent: 5.0  # Stop trading if lose 5% in a day
+  
+  # Spread protection
+  max_spread_pips: 5           # Don't trade if spread > 5 pips
+  spread_buffer: 2             # Add 2 pips to SL/TP for spread costs
+
+# SESSION FILTERS (Trade only during active periods)
+session_filters:
+  enabled: true
+  
+  preferred_sessions:
+    'FTSE 100': ['london', 'overlap']  # London session and NY overlap
+    'DAX': ['london', 'overlap']       # European sessions
+    'default': ['london', 'new_york']
+  
+  avoid_periods:
+    - "00:00-06:00"  # Asian session (low volume for EUR/GBP)
+    - "21:00-23:00"  # Late US session
+
+# VOLATILITY FILTERS
+volatility:
+  enabled: true
+  
+  # Only trade during sufficient volatility
+  min_atr_threshold: 8.0       # Minimum ATR to enable trading
+  max_atr_threshold: 50.0      # Maximum ATR (avoid extreme volatility)
+  
+  # Trend strength filter
+  min_trend_strength: 0.001    # Minimum MA separation
+  
+# TECHNICAL PARAMETERS
+technical:
+  # Candle requirements
+  min_candles_required: 50     # Need 50+ candles before trading
+  
+  # Signal confirmation
+  signal_confirmation: true    # Wait for candle close confirmation
+  
+  # Data quality
+  max_gap_minutes: 10          # Reject data with >10min gaps
+
+# PERFORMANCE OPTIMIZATION
+performance:
+  # Memory management
+  max_candles_memory: 1000
+  
+  # Processing
+  update_frequency: 'on_new_candle'  # Update on candle close only
+  
+  # Logging
+  log_level: 'trades_only'     # Log trades only, not all signals
+
+# MAINTENANCE SETTINGS
+maintenance:
+  # Auto-restart conditions
+  restart_on_loss_streak: 5    # Restart after 5 consecutive losses
+  restart_on_drawdown: 10.0    # Restart if drawdown > 10%
+  
+  # Health checks
+  check_connection_interval: 300  # Check connectivity every 5 minutes
+  
+  # Updates
+  strategy_review_days: 30     # Review strategy every 30 days

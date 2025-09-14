@@ -1,0 +1,338 @@
+# configs/autonomous_config.yaml
+# Master configuration for the Autonomous Trading System
+# Combines all components: engine, learning, monitoring, and risk management
+
+# AUTONOMOUS TRADING ENGINE CONFIGURATION
+autonomous_engine:
+  # Core trading parameters
+  trading:
+    enabled: true
+    max_simultaneous_positions: 3
+    position_size_percent: 2.0      # 2% of account per trade
+    default_timeframe: "10T"        # 10-minute candles (proven optimal)
+    
+  # Strategy selection and parameters
+  strategies:
+    primary_strategy: "ma_crossover"  # Proven most profitable
+    backup_strategy: "supertrend"     # Secondary strategy
+    
+    ma_crossover:
+      fast_period: 5
+      slow_period: 20
+      signal_confirmation: true
+      trend_filter: true
+      
+    supertrend:
+      atr_period: 10
+      multiplier: 2.0
+      trend_confirmation: true
+      
+  # Market-specific adjustments
+  market_adjustments:
+    'FTSE 100':
+      volatility_multiplier: 1.0
+      spread_adjustment: 1.0
+      stop_loss_pips: 15
+      take_profit_pips: 30
+      
+    'DAX':
+      volatility_multiplier: 1.2    # Higher volatility
+      spread_adjustment: 1.1
+      stop_loss_pips: 20
+      take_profit_pips: 40
+      
+    'default':
+      volatility_multiplier: 1.0
+      spread_adjustment: 1.0
+      stop_loss_pips: 15
+      take_profit_pips: 30
+
+# ADAPTIVE LEARNING SYSTEM CONFIGURATION
+adaptive_learning:
+  # Machine learning settings
+  ml_enabled: true
+  learning_rate: 0.01
+  adaptation_frequency: 50          # Adapt every 50 trades
+  
+  # Market regime detection
+  regime_detection:
+    enabled: true
+    lookback_period: 100
+    confidence_threshold: 0.7
+    regimes: ['trending', 'ranging', 'volatile', 'calm']
+    
+  # Parameter optimization
+  optimization:
+    method: 'genetic_algorithm'
+    population_size: 20
+    generations: 10
+    mutation_rate: 0.1
+    
+    # Parameters to optimize
+    optimize_parameters:
+      - 'stop_loss_pips'
+      - 'take_profit_pips'
+      - 'position_size_percent'
+      - 'ma_fast_period'
+      - 'ma_slow_period'
+      
+  # Learning targets
+  performance_targets:
+    min_win_rate: 55.0
+    min_profit_factor: 1.8
+    max_drawdown: 10.0
+    min_sharpe_ratio: 1.5
+    
+  # Model persistence
+  model_save_path: "models/autonomous_models/"
+  save_frequency: 100               # Save every 100 adaptations
+
+# RISK MANAGEMENT CONFIGURATION
+risk_management:
+  # Position sizing and limits
+  position_limits:
+    max_position_size: 5.0          # Max 5% of account
+    max_total_exposure: 15.0        # Max 15% total exposure
+    max_correlation: 0.7            # Max correlation between positions
+    
+  # Daily and session limits
+  daily_limits:
+    max_trades: 12                  # Max trades per day
+    max_loss_amount: 500            # Max daily loss in base currency
+    max_loss_percent: 5.0           # Max daily loss as % of account
+    
+  # Stop loss and take profit
+  stop_loss:
+    type: 'dynamic'                 # dynamic, fixed, atr_based
+    min_stop_pips: 10
+    max_stop_pips: 50
+    atr_multiplier: 2.0
+    trailing_enabled: true
+    
+  take_profit:
+    type: 'dynamic'
+    min_profit_pips: 15
+    max_profit_pips: 100
+    risk_reward_ratio: 2.0
+    partial_close_enabled: true
+    
+  # Emergency controls
+  emergency_controls:
+    max_consecutive_losses: 5
+    max_drawdown_percent: 15.0
+    volatility_shutdown_threshold: 100.0
+    connectivity_timeout: 300       # 5 minutes
+    
+    # Emergency actions
+    actions:
+      - 'close_all_positions'
+      - 'block_new_trades'
+      - 'send_emergency_alerts'
+      - 'log_emergency_event'
+
+# MONITORING SYSTEM CONFIGURATION  
+monitoring:
+  # Alert thresholds
+  alerts:
+    # Performance alerts
+    max_daily_loss: 400             # £400 daily loss limit
+    max_drawdown: 12.0              # 12% max drawdown
+    min_balance: 8500               # £8500 minimum balance
+    min_win_rate: 40.0              # 40% minimum win rate
+    min_profit_factor: 1.0          # 1.0 minimum profit factor
+    
+    # Risk alerts  
+    max_positions: 3                # Maximum concurrent positions
+    max_daily_trades: 12            # Maximum daily trades
+    max_risk_score: 0.8             # Risk score threshold
+    min_confidence: 0.5             # ML confidence threshold
+    
+    # System alerts
+    max_system_downtime: 300        # 5 minutes max downtime
+    memory_threshold: 80            # 80% memory usage
+    cpu_threshold: 90               # 90% CPU usage
+    
+  # Notification settings
+  notifications:
+    email_enabled: false            # Email notifications
+    console_enabled: true           # Console notifications
+    file_logging: true              # File logging
+    
+    # Alert frequency limits
+    max_alerts_per_hour: 20
+    alert_cooldown_minutes: 5
+    
+  # Dashboard settings
+  dashboard:
+    update_interval: 10             # Seconds between updates
+    chart_timeframe: "1H"           # Chart timeframe
+    show_advanced_metrics: true
+    
+  # Data retention
+  retention:
+    metrics_hours: 168              # 1 week of metrics
+    alerts_days: 30                 # 30 days of alerts
+    logs_days: 90                   # 90 days of logs
+
+# MARKET DATA CONFIGURATION
+market_data:
+  # Data sources and processing
+  sources:
+    primary: "tick_files"           # tick_files, live_feed, hybrid
+    backup: "none"
+    
+  # Candle aggregation
+  aggregation:
+    primary_timeframe: "10T"        # 10-minute candles
+    secondary_timeframes: ["5T", "15T", "30T"]
+    
+    # Volatility filtering
+    volatility_filter:
+      enabled: true
+      min_atr_threshold: 5.0
+      max_atr_threshold: 50.0
+      consolidation_filter: true
+      
+  # Session filtering
+  session_filters:
+    enabled: true
+    sessions:
+      london:
+        start: "08:00"
+        end: "16:30"
+        enabled: true
+        
+      new_york:
+        start: "13:30"
+        end: "20:00" 
+        enabled: true
+        
+      overlap:
+        start: "13:30"
+        end: "16:30"
+        enabled: true
+        priority: 1
+
+# PERFORMANCE BENCHMARKS
+benchmarks:
+  # Target performance metrics
+  targets:
+    daily_return: 2.0               # 2% daily return target
+    monthly_return: 20.0            # 20% monthly return target
+    annual_return: 100.0            # 100% annual return target
+    
+  # Risk-adjusted metrics
+  risk_adjusted:
+    target_sharpe_ratio: 2.0
+    target_sortino_ratio: 2.5
+    max_acceptable_drawdown: 15.0
+    target_calmar_ratio: 3.0
+    
+  # Comparative benchmarks
+  comparisons:
+    market_index: "FTSE_100"
+    risk_free_rate: 0.02            # 2% risk-free rate
+    
+# SYSTEM SETTINGS
+system:
+  # General settings
+  base_currency: "GBP"
+  starting_balance: 10000.0
+  timezone: "Europe/London"
+  
+  # Logging configuration
+  logging:
+    level: "INFO"                   # DEBUG, INFO, WARNING, ERROR
+    file_rotation: true
+    max_file_size: "100MB"
+    backup_count: 5
+    
+    # Component logging levels
+    component_levels:
+      autonomous_engine: "INFO"
+      adaptive_learning: "INFO"
+      monitoring: "INFO"
+      risk_management: "WARNING"
+      
+  # Performance settings
+  performance:
+    update_frequency: 1.0           # Seconds between system updates
+    batch_size: 100                 # Batch size for data processing
+    parallel_processing: true
+    max_workers: 4
+    
+  # File paths
+  paths:
+    models: "models/"
+    logs: "logs/"
+    results: "results/"
+    backups: "backups/"
+    
+# INTEGRATION SETTINGS
+integrations:
+  # External services
+  external_services:
+    market_data_feed: false
+    news_sentiment: false
+    economic_calendar: false
+    
+  # API connections
+  apis:
+    trading_api: false
+    market_data_api: false
+    notification_api: false
+    
+# DEVELOPMENT AND TESTING
+development:
+  # Debug settings
+  debug_mode: false
+  verbose_logging: false
+  trace_decisions: false
+  
+  # Testing settings
+  backtesting:
+    fast_mode: false               # Skip some calculations for speed
+    validation_split: 0.2          # 20% validation data
+    bootstrap_samples: 100
+    
+  # Safety features
+  safety:
+    paper_trading_mode: true       # Always use paper trading in backtest
+    max_test_trades: 1000          # Limit trades in testing
+    confirm_live_trading: true     # Require confirmation for live trading
+
+# ADVANCED FEATURES
+advanced:
+  # Multi-timeframe analysis
+  multi_timeframe:
+    enabled: true
+    timeframes: ["5T", "10T", "15T", "30T"]
+    confirmation_required: 2       # Require confirmation from 2 timeframes
+    
+  # Portfolio optimization
+  portfolio:
+    optimization_method: "mean_variance"
+    rebalance_frequency: "daily"
+    max_portfolio_correlation: 0.6
+    
+  # Advanced risk models
+  risk_models:
+    value_at_risk: true
+    expected_shortfall: true
+    monte_carlo_simulation: false
+    
+# EMAIL CONFIGURATION (if enabled)
+email:
+  enabled: false
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+  username: ""                     # Set your email
+  password: ""                     # Set your app password  
+  from_email: ""
+  to_email: ""
+  
+  # Email templates
+  templates:
+    emergency_alert: "Emergency trading alert"
+    daily_summary: "Daily trading summary"
+    weekly_report: "Weekly performance report"

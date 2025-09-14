@@ -17,10 +17,10 @@ mongodb:
 strategy:
   mode: "HISTORICAL"  # or LIVE
   rsi_period: 14
-  rsi_buy_threshold: 70  # More sensitive - was 80
-  rsi_sell_threshold: 30  # More sensitive - was 20
-  stop_loss_pips: 10
-  take_profit_pips: 20
+  rsi_buy_threshold: 60  # OPTIMIZED - Best performance
+  rsi_sell_threshold: 40  # OPTIMIZED - Best performance  
+  stop_loss_pips: 12  # OPTIMIZED - Best performance
+  take_profit_pips: 25 # OPTIMIZED - Best performance
   dynamic_atr_sltp: true
 
 # 🚀 Dynamic Position Management
@@ -41,3 +41,78 @@ dynamic_limits:
     rapid_check_duration: 300  # Duration of rapid checking (5 minutes)
     emergency_stop_multiplier: 0.7  # Tighten stop loss to 70% of original
     adverse_signal_close: true  # Close if signal flips opposite immediately
+
+# 🎯 Dynamic Margin Rate Management
+margin_management:
+  enabled: true  # Enable intelligent margin rate system
+  
+  # API Usage Optimization
+  api_optimization:
+    daily_request_limit: 800  # Conservative daily API limit (IG allows 1000+)
+    bulk_fetch_hour: 6       # UTC hour for daily margin sync (6 AM UTC)
+    cache_duration_minutes: 15  # How long to cache margin rates
+    fallback_to_schedule: true  # Use scheduled rates when API unavailable
+    emergency_api_reserve: 50   # Reserve API calls for emergency operations
+  
+  # Default Margin Rates by Asset Class
+  # These are fallback rates when IG API data is unavailable
+  default_rates:
+    # Foreign Exchange (24/5 trading)
+    forex:
+      market_hours: 0.0333    # 3.33% during active trading
+      overnight: 0.05         # 5% during overnight hours
+      
+    # Stock Indices (market hours vary by region)  
+    indices:
+      market_hours: 0.01      # 1% during market hours
+      overnight: 0.02         # 2% overnight/pre-market
+      
+    # Commodities (extended hours)
+    commodities:
+      market_hours: 0.05      # 5% during active hours
+      overnight: 0.08         # 8% overnight
+      
+    # Stocks (market hours only)
+    stocks:
+      market_hours: 0.02      # 2% during market hours
+      overnight: 0.05         # 5% when market closed
+      
+    # Cryptocurrencies (24/7 trading)
+    crypto:
+      market_hours: 0.10      # 10% standard rate
+      overnight: 0.10         # Same rate (always active)
+    
+    # Weekend multiplier for all asset classes
+    weekend_multiplier: 1.5   # 50% higher margins on weekends
+    
+    # Holiday multiplier
+    holiday_multiplier: 1.3   # 30% higher on holidays
+  
+  # Position Size Tier Multipliers (IG's tiered margin structure)
+  tiered_margins:
+    tier_1_max: 5000         # Tier 1: £0-5K (best rates)
+    tier_1_multiplier: 1.0   # Base rate
+    
+    tier_2_max: 25000        # Tier 2: £5K-25K
+    tier_2_multiplier: 1.2   # 20% higher
+    
+    tier_3_max: 100000       # Tier 3: £25K-100K
+    tier_3_multiplier: 1.5   # 50% higher
+    
+    tier_4_multiplier: 2.0   # Tier 4: £100K+ (100% higher)
+  
+  # Risk Management Integration
+  risk_integration:
+    auto_adjust_position_sizes: true    # Automatically adjust for margin changes
+    margin_buffer_percent: 10           # Keep 10% margin buffer for safety
+    max_margin_utilization: 80          # Never use more than 80% of available margin
+    margin_call_threshold: 90           # Alert at 90% margin utilization
+    emergency_close_threshold: 95       # Auto-close positions at 95% utilization
+  
+  # Scheduling and Automation
+  scheduler:
+    enabled: true                       # Enable predictive rate scheduling  
+    check_interval_minutes: 5           # How often to check for rate changes
+    preload_window_hours: 24            # Schedule changes 24 hours ahead
+    sync_with_market_hours: true        # Align syncs with major market opens
+    weekend_preparation: true           # Pre-calculate weekend rates on Friday

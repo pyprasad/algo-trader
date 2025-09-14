@@ -96,15 +96,157 @@ brew services start mongodb-community
 3. Get connection string
 4. Update `configs/database_config.yaml` with connection string
 
-### 4. Configure IG Markets API
+### 4. Environment Configuration
+
+#### Create Environment File
+
+```bash
+# Copy the environment template
+cp .env.example .env
+
+# Edit the .env file with your credentials
+nano .env  # or use your preferred editor
+```
+
+Fill in your credentials in the `.env` file:
+
+```bash
+# IG Markets API Credentials
+IG_API_KEY=your_actual_api_key_here
+IG_USERNAME=your_ig_username
+IG_PASSWORD=your_ig_password
+
+# Database Configuration
+MONGODB_URI=mongodb://127.0.0.1:27017  # or your MongoDB Atlas URI
+
+# Feature Flags - Enable margin management
+MARGIN_MANAGEMENT_ENABLED=true
+DYNAMIC_LIMITS_ENABLED=true
+EMERGENCY_PROTECTION_ENABLED=true
+
+# Environment Settings
+ENVIRONMENT=development
+LOG_LEVEL=INFO
+```
+
+**⚠️ IMPORTANT**: 
+- Never commit the `.env` file to version control
+- Keep your credentials secure
+- Use different credentials for development and production
+
+#### Configure Main Settings
+
+```bash
+# Copy the configuration template (if it exists)
+cp configs/global.yaml.example configs/global.yaml
+
+# Or ensure configs/global.yaml exists with the settings from CONFIGURATION.md
+```
+
+### 5. Configure IG Markets API
 
 #### Get API Credentials
 1. Sign up for IG Markets account:
-   - Demo: https://www.ig.com/uk/demo-account
-   - Live: https://www.ig.com/uk/trading-account
-2. Log into your account
-3. Navigate to Settings → API
-4. Generate API key
+   - **Demo (Recommended for testing)**: https://www.ig.com/uk/demo-account
+   - **Live**: https://www.ig.com/uk
+
+2. Create API key:
+   - Log into your IG account
+   - Go to "My Account" → "API Keys"
+   - Create a new API key
+   - Copy the API key to your `.env` file
+
+3. Get your account details:
+   - Username: Your IG login username
+   - Password: Your IG login password
+   - Account Number: Found in your account dashboard
+
+#### Verify API Access
+
+Test your API credentials:
+
+```bash
+# Run the configuration test
+python core/secure_config.py
+
+# You should see:
+# ✅ Secure configuration loaded successfully
+# Configuration validated successfully
+```
+
+### 6. System Verification
+
+#### Test Core Components
+
+```bash
+# Test margin rate manager
+python core/margin_rate_manager.py
+
+# Expected output:
+# 🎯 Margin Rate Manager initialized
+# 📊 Initialized market hours for X instruments
+# ✅ Preloaded margin rates for X/Y instruments
+
+# Test enhanced margin calculator
+python core/enhanced_margin_calculator.py
+
+# Expected output:
+# 📊 Enhanced Margin Calculator initialized
+# Test results with margin calculations
+
+# Test secure configuration
+python core/secure_config.py
+
+# Expected output:
+# ✅ Secure configuration loaded successfully
+```
+
+#### Test Database Connection
+
+```bash
+# Test MongoDB connection
+python -c "
+from pymongo import MongoClient
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+client = MongoClient(os.getenv('MONGODB_URI'))
+print('✅ MongoDB connected:', client.server_info()['version'])
+"
+```
+
+### 7. Initialize the System
+
+#### Create Required Directories
+
+```bash
+# Create cache directory for margin rates
+mkdir -p cache
+
+# Create logs directory
+mkdir -p logs
+
+# Ensure configs directory exists
+mkdir -p configs
+
+# Set proper permissions
+chmod 750 cache logs
+```
+
+#### First Run - Demo Mode
+
+```bash
+# Run in demo mode to test everything
+python runners/run_multi_market.py --demo
+
+# You should see:
+# 🚀 Starting Dynamic Position Manager...
+# 🎯 Margin Rate Manager initialized
+# 📅 Margin Scheduler started
+# ⚡ API Request Optimizer started
+# ✅ All systems initialized
+```
 
 #### Configure Credentials
 ```bash

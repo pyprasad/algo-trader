@@ -27,14 +27,15 @@ import json
 import requests
 from dataclasses import dataclass
 
-# Load configurations
-with open("configs/global.yaml", "r") as f:
-    config = yaml.safe_load(f)
+# Import secure configuration
+from core.secure_config import get_secure_config
 
 from data.db import trades_collection, get_market_tick_data
 from core.enhanced_strategy_engine import get_enhanced_strategy_engine
 from data.trade_streamer import get_live_active_trades
 from api.ig_position_manager import get_ig_position_manager
+from core.margin_rate_manager import get_margin_rate_manager
+from core.margin_scheduler import get_margin_scheduler
 
 @dataclass
 class PositionAnalysis:
@@ -50,6 +51,9 @@ class PositionAnalysis:
     market_regime: str
     recommended_limit_multiplier: float
     reason: str
+    current_margin_rate: float = 0.0
+    margin_utilization: float = 0.0
+    margin_adjusted_size: float = 0.0
 
 class DynamicPositionManager:
     """
@@ -59,17 +63,18 @@ class DynamicPositionManager:
     
     def __init__(self):
         """Initialize the dynamic position manager"""
-        # Load configuration
-        self.enabled = config.get("dynamic_limits", {}).get("enabled", False)
-        self.update_interval = config.get("dynamic_limits", {}).get("update_interval_seconds", 30)
-        self.confidence_threshold = config.get("dynamic_limits", {}).get("confidence_threshold", 0.7)
-        self.max_increase = config.get("dynamic_limits", {}).get("max_limit_increase", 2.0)
-        self.min_decrease = config.get("dynamic_limits", {}).get("min_limit_decrease", 0.5)
-        self.pnl_threshold = config.get("dynamic_limits", {}).get("pnl_threshold_percent", 5.0)
-        self.lookback_minutes = config.get("dynamic_limits", {}).get("strategy_lookback_minutes", 15)
+        # Load secure configuration
+        self.config = get_secure_config()
+        self.enabled = self.config.get("dynamic_limits", {}).get("enabled", False)
+        self.update_interval = self.config.get("dynamic_limits", {}).get("update_interval_seconds", 30)
+        self.confidence_threshold = self.config.get("dynamic_limits", {}).get("confidence_threshold", 0.7)
+        self.max_increase = self.config.get("dynamic_limits", {}).get("max_limit_increase", 2.0)
+        self.min_decrease = self.config.get("dynamic_limits", {}).get("min_limit_decrease", 0.5)
+        self.pnl_threshold = self.config.get("dynamic_limits", {}).get("pnl_threshold_percent", 5.0)
+        self.lookback_minutes = self.config.get("dynamic_limits", {}).get("strategy_lookback_minutes", 15)
         
         # Emergency protection configuration
-        emergency_config = config.get("dynamic_limits", {}).get("emergency_protection", {})
+        emergency_config = self.config.get("dynamic_limits", {}).get("emergency_protection", {})
         self.emergency_enabled = emergency_config.get("enabled", True)
         self.immediate_loss_threshold = emergency_config.get("immediate_loss_threshold", 15)
         self.rapid_check_interval = emergency_config.get("rapid_check_interval", 5)
@@ -78,7 +83,7 @@ class DynamicPositionManager:
         self.adverse_signal_close = emergency_config.get("adverse_signal_close", True)
         
         # IG API configuration
-        self.ig_config = config["ig"]
+        self.ig_config = self.config.get("ig", {})
         self.session_token = None
         self.cst_token = None
         
@@ -90,6 +95,20 @@ class DynamicPositionManager:
         self.strategy_engine = get_enhanced_strategy_engine()
         self.ig_manager = get_ig_position_manager() if self.enabled else None
         self.lock = threading.Lock()
+        
+        # 🎯 Margin Management Integration
+        margin_config = self.config.get("margin_management", {})
+        self.margin_enabled = margin_config.get("enabled", True)
+        self.margin_manager = get_margin_rate_manager() if self.margin_enabled else None
+        self.margin_scheduler = get_margin_scheduler() if self.margin_enabled else None
+        
+        # Margin risk integration settings
+        risk_config = margin_config.get("risk_integration", {})
+        self.auto_adjust_sizes = risk_config.get("auto_adjust_position_sizes", True)
+        self.margin_buffer = risk_config.get("margin_buffer_percent", 10) / 100  # Convert to decimal
+        self.max_margin_utilization = risk_config.get("max_margin_utilization", 80) / 100
+        self.margin_call_threshold = risk_config.get("margin_call_threshold", 90) / 100
+        self.emergency_close_threshold = risk_config.get("emergency_close_threshold", 95) / 100
         
         print(f"🚀 Dynamic Position Manager initialized")
         print(f"   Status: {'✅ ENABLED' if self.enabled else '❌ DISABLED'}")
@@ -103,6 +122,11 @@ class DynamicPositionManager:
                 print(f"      Loss Threshold: {self.immediate_loss_threshold} pips")
                 print(f"      Rapid Check: Every {self.rapid_check_interval}s for {self.rapid_check_duration//60}min")
                 print(f"      Emergency Stop: {self.emergency_stop_multiplier}x tighter")
+            if self.margin_enabled:
+                print(f"   🎯 Margin Management: ACTIVE")
+                print(f"      Auto-adjust Sizes: {self.auto_adjust_sizes}")
+                print(f"      Max Utilization: {self.max_margin_utilization*100:.0f}%")
+                print(f"      Margin Buffer: {self.margin_buffer*100:.0f}%")
     
     def start(self):
         """Start the dynamic position management thread"""
@@ -123,6 +147,11 @@ class DynamicPositionManager:
             self.emergency_thread.start()
             print("🚨 Emergency protection thread started")
         
+        # Start margin scheduler if enabled
+        if self.margin_enabled and self.margin_scheduler:
+            self.margin_scheduler.start()
+            print("🎯 Margin scheduler started")
+        
         print("✅ Dynamic Position Manager started")
         return True
     
@@ -132,6 +161,11 @@ class DynamicPositionManager:
         self.running = False
         if hasattr(self, 'management_thread'):
             self.management_thread.join(timeout=5)
+        
+        # Stop margin scheduler if running
+        if self.margin_enabled and self.margin_scheduler:
+            self.margin_scheduler.stop()
+            
         print("✅ Dynamic Position Manager stopped")
     
     def _management_loop(self):
@@ -240,6 +274,14 @@ class DynamicPositionManager:
             print(f"   Recommended Limit Multiplier: {analysis.recommended_limit_multiplier:.2f}x")
             print(f"   Reason: {analysis.reason}")
             
+            # 🎯 Display margin information if available
+            if self.margin_enabled and analysis.current_margin_rate > 0:
+                print(f"   🎯 Margin Rate: {analysis.current_margin_rate*100:.2f}%")
+                if analysis.margin_utilization > 0:
+                    print(f"   📊 Margin Utilization: {analysis.margin_utilization*100:.1f}%")
+                if analysis.margin_adjusted_size != analysis.size:
+                    print(f"   📏 Adjusted Size: {analysis.size} → {analysis.margin_adjusted_size}")
+            
             # Check if adjustment is needed
             current_multiplier = self._get_current_limit_multiplier(position)
             
@@ -322,10 +364,35 @@ class DynamicPositionManager:
             original_tp_pips = config["strategy"]["take_profit_pips"]
             expected_pnl = original_tp_pips * size  # Simplified calculation
             
-            # Determine recommended limit multiplier
+            # 🎯 Add margin calculations if enabled
+            current_margin_rate = 0.0
+            margin_utilization = 0.0
+            margin_adjusted_size = size
+            
+            if self.margin_enabled and self.margin_manager:
+                try:
+                    # Get current margin rate for this instrument
+                    current_margin_rate = self.margin_manager.get_current_margin_rate(market, size * current_price)
+                    
+                    # Calculate margin utilization (simplified - would need account balance)
+                    required_margin = size * current_price * current_margin_rate
+                    # margin_utilization = required_margin / account_balance  # Would need actual balance
+                    margin_utilization = 0.0  # Placeholder
+                    
+                    # Check if position size should be adjusted for margin changes
+                    if self.auto_adjust_sizes:
+                        # This is where you'd implement dynamic position sizing based on margin
+                        # For now, keep original size
+                        margin_adjusted_size = size
+                        
+                except Exception as e:
+                    print(f"⚠️ Error calculating margin data for {market}: {e}")
+                    current_margin_rate = 0.02  # Conservative fallback
+            
+            # Determine recommended limit multiplier (now including margin considerations)
             multiplier, reason = self._calculate_limit_multiplier(
                 current_pnl, expected_pnl, strategy_confidence, 
-                market_regime, current_signal, direction
+                market_regime, current_signal, direction, current_margin_rate
             )
             
             return PositionAnalysis(
@@ -339,7 +406,10 @@ class DynamicPositionManager:
                 strategy_confidence=strategy_confidence,
                 market_regime=market_regime,
                 recommended_limit_multiplier=multiplier,
-                reason=reason
+                reason=reason,
+                current_margin_rate=current_margin_rate,
+                margin_utilization=margin_utilization,
+                margin_adjusted_size=margin_adjusted_size
             )
             
         except Exception as e:
@@ -348,7 +418,7 @@ class DynamicPositionManager:
     
     def _calculate_limit_multiplier(self, current_pnl: float, expected_pnl: float, 
                                   confidence: float, regime: str, signal: str, 
-                                  direction: str) -> Tuple[float, str]:
+                                  direction: str, margin_rate: float = 0.0) -> Tuple[float, str]:
         """Calculate the recommended limit multiplier based on analysis"""
         
         base_multiplier = 1.0
@@ -397,8 +467,22 @@ class DynamicPositionManager:
             signal_boost = -0.3
             reasons.append("Signal opposition")
         
+        # 🎯 Factor 5: Margin Rate Considerations
+        margin_boost = 0
+        if self.margin_enabled and margin_rate > 0:
+            # Higher margin rates suggest higher risk - be more conservative
+            if margin_rate >= 0.05:  # 5% or higher margin
+                margin_boost = -0.2  # Reduce limits for high-margin instruments
+                reasons.append(f"High margin rate ({margin_rate*100:.1f}%)")
+            elif margin_rate >= 0.02:  # 2-5% margin
+                margin_boost = -0.1  # Slightly reduce limits
+                reasons.append(f"Moderate margin rate ({margin_rate*100:.1f}%)")
+            else:  # Low margin rates allow more aggressive limits
+                margin_boost = 0.1
+                reasons.append(f"Low margin rate ({margin_rate*100:.1f}%)")
+        
         # Calculate final multiplier
-        total_adjustment = confidence_boost + performance_boost + regime_boost + signal_boost
+        total_adjustment = confidence_boost + performance_boost + regime_boost + signal_boost + margin_boost
         final_multiplier = base_multiplier + total_adjustment
         
         # Apply bounds
@@ -469,6 +553,45 @@ class DynamicPositionManager:
             with self.lock:
                 self.emergency_positions[deal_reference] = time.time()
                 print(f"🚨 Started emergency monitoring for {deal_reference}")
+    
+    def add_position_for_margin_monitoring(self, deal_reference: str, instrument: str):
+        """Add a new position for margin rate monitoring"""
+        if self.margin_enabled and self.margin_scheduler:
+            # Force an immediate rate update for this instrument
+            success = self.margin_scheduler.force_rate_update(instrument)
+            if success:
+                print(f"🎯 Started margin monitoring for {deal_reference} ({instrument})")
+            else:
+                print(f"⚠️ Failed to start margin monitoring for {deal_reference}")
+    
+    def get_margin_summary(self) -> Dict:
+        """Get comprehensive margin management summary"""
+        if not self.margin_enabled:
+            return {"enabled": False}
+        
+        summary = {"enabled": True}
+        
+        # Get margin manager status
+        if self.margin_manager:
+            summary["margin_manager"] = self.margin_manager.get_status()
+        
+        # Get scheduler status  
+        if self.margin_scheduler:
+            summary["scheduler"] = self.margin_scheduler.get_status()
+            
+            # Get upcoming rate changes
+            upcoming_changes = self.margin_scheduler.get_upcoming_changes(hours=24)
+            summary["upcoming_changes"] = len(upcoming_changes)
+            summary["next_changes"] = [
+                {
+                    "instrument": change.instrument,
+                    "change_time": change.change_time.isoformat(),
+                    "rate_change": f"{change.old_rate:.4f} -> {change.new_rate:.4f}"
+                }
+                for change in upcoming_changes[:5]  # Show next 5 changes
+            ]
+        
+        return summary
     
     def _perform_emergency_check(self, deal_reference: str):
         """Perform emergency check on a position"""
@@ -643,7 +766,10 @@ class DynamicPositionManager:
                 strategy_confidence=strategy_confidence,
                 market_regime=market_regime,
                 recommended_limit_multiplier=multiplier,
-                reason=reason
+                reason=reason,
+                current_margin_rate=0.0,  # Minimal analysis doesn't have margin data
+                margin_utilization=0.0,
+                margin_adjusted_size=size
             )
             
         except Exception as e:

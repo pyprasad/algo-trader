@@ -1,0 +1,154 @@
+# Configurable Timeframe Trading System
+# All timeframes and parameters can be easily modified here
+
+timeframes:
+  # Available timeframes for testing
+  available: ['1T', '5T', '15T', '30T', '1H', '4H', '1D']  # T=minutes, H=hours, D=days
+  
+  # Default timeframe for live trading
+  default: '5T'  # 5-minute candles
+  
+  # Test multiple timeframes simultaneously
+  test_modes:
+    scalping: ['1T', '5T']           # Ultra short-term
+    day_trading: ['15T', '30T', '1H'] # Intraday
+    swing: ['4H', '1D']              # Position trading
+
+# Session-based trading (times in UTC)
+sessions:
+  london:
+    enabled: true
+    start_time: "07:00"
+    end_time: "16:00" 
+    description: "London trading session"
+    
+  new_york:
+    enabled: true
+    start_time: "13:00"
+    end_time: "22:00"
+    description: "New York trading session"
+    
+  overlap:
+    enabled: true
+    start_time: "13:00" 
+    end_time: "16:00"
+    description: "London-NY overlap (highest volume)"
+    
+  asian:
+    enabled: false
+    start_time: "23:00"
+    end_time: "07:00"
+    description: "Asian session"
+
+# Strategy configuration by timeframe
+strategy_by_timeframe:
+  '1T':  # 1-minute scalping
+    algorithm: 'supertrend'
+    atr_period: 10
+    multiplier: 2.0
+    stop_loss_atr: 1.5
+    take_profit_atr: 3.0
+    
+  '5T':  # 5-minute day trading
+    algorithm: 'ma_crossover'
+    fast_ma: 10
+    slow_ma: 50
+    stop_loss_pips: 15
+    take_profit_pips: 30
+    
+  '15T': # 15-minute swing
+    algorithm: 'rsi_trend'
+    rsi_period: 14
+    rsi_overbought: 80
+    rsi_oversold: 20
+    trend_ema: 200
+    stop_loss_pips: 25
+    take_profit_pips: 50
+    
+  '30T': # 30-minute position
+    algorithm: 'bollinger_rsi'
+    bollinger_period: 20
+    bollinger_std: 2.0
+    rsi_period: 14
+    rsi_buy: 30
+    rsi_sell: 70
+    
+  '1H':  # 1-hour trend following
+    algorithm: 'supertrend'
+    atr_period: 14
+    multiplier: 3.0
+    stop_loss_atr: 2.0
+    take_profit_atr: 4.0
+
+# Market-specific adjustments
+market_adjustments:
+  'FTSE 100':
+    volatility_multiplier: 1.0
+    spread_adjustment: 2.0
+    preferred_timeframes: ['5T', '15T', '1H']
+    avoid_sessions: []
+    
+  'DAX':
+    volatility_multiplier: 1.5  # DAX is more volatile
+    spread_adjustment: 3.0
+    preferred_timeframes: ['15T', '30T', '1H']
+    avoid_sessions: ['asian']
+
+# Risk management by timeframe
+risk_management:
+  '1T':
+    max_trades_per_day: 50
+    max_drawdown_percent: 2.0
+    position_size_percent: 1.0
+    
+  '5T':
+    max_trades_per_day: 20
+    max_drawdown_percent: 3.0
+    position_size_percent: 2.0
+    
+  '15T':
+    max_trades_per_day: 10
+    max_drawdown_percent: 5.0
+    position_size_percent: 3.0
+    
+  '30T':
+    max_trades_per_day: 5
+    max_drawdown_percent: 7.0
+    position_size_percent: 5.0
+    
+  '1H':
+    max_trades_per_day: 3
+    max_drawdown_percent: 10.0
+    position_size_percent: 10.0
+
+# Volatility-based trading
+volatility_filters:
+  enabled: true
+  
+  # Only trade during high volatility periods
+  min_atr_threshold: 0.5  # Minimum ATR to enable trading
+  
+  # Avoid trading during low volatility
+  consolidation_filter: true
+  consolidation_atr_ratio: 0.3  # ATR must be > 30% of recent average
+  
+  # News/event detection
+  news_impact:
+    major_news_pause_minutes: 30  # Pause trading 30min before/after major news
+    earnings_pause_hours: 2       # Pause 2 hours around earnings
+    central_bank_pause_hours: 4   # Pause 4 hours around central bank announcements
+
+# Performance optimization
+optimization:
+  # Backtesting settings
+  sample_size_limit: 100000  # Limit ticks for faster testing
+  
+  # Live trading settings  
+  signal_frequency: 'on_candle_close'  # or 'on_tick'
+  
+  # Memory management
+  max_candles_in_memory: 5000
+  
+  # Logging
+  log_all_signals: false
+  log_trades_only: true

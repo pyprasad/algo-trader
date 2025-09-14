@@ -1,0 +1,114 @@
+# configs/monitoring_config.yaml
+# Monitoring and alerting configuration for autonomous trading system
+
+# Alert thresholds and configurations
+alerts:
+  # Risk management alerts
+  max_daily_loss: 500          # Maximum daily loss in £
+  max_drawdown: 15.0           # Maximum drawdown percentage
+  min_balance: 8000            # Minimum balance threshold
+  max_positions: 3             # Maximum concurrent positions
+  max_daily_trades: 12         # Maximum trades per day
+  
+  # Performance alerts
+  min_win_rate: 35.0           # Minimum acceptable win rate %
+  min_profit_factor: 0.8       # Minimum profit factor
+  max_consecutive_losses: 5    # Max consecutive losing trades
+  
+  # System health alerts
+  max_system_downtime: 300     # Max seconds without updates
+  max_memory_usage: 80         # Max memory usage percentage
+  max_cpu_usage: 90            # Max CPU usage percentage
+
+# Email notification settings
+email:
+  enabled: false               # Enable/disable email alerts
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+  username: "your_email@gmail.com"
+  password: "your_app_password"
+  from_email: "trading_system@yourcompany.com"
+  to_email: "alerts@yourcompany.com"
+  
+  # Email frequency limits
+  max_emails_per_hour: 10
+  cooldown_minutes: 15         # Cooldown between similar alerts
+
+# Monitoring intervals
+monitoring:
+  metrics_update_interval: 60  # Seconds between metric updates
+  health_check_interval: 120   # Seconds between health checks
+  alert_check_interval: 30     # Seconds between alert checks
+  
+  # Data retention
+  metrics_retention_hours: 168 # Keep metrics for 1 week
+  alert_retention_days: 30     # Keep alerts for 30 days
+  log_retention_days: 90       # Keep logs for 90 days
+
+# Dashboard settings
+dashboard:
+  refresh_interval: 30         # Seconds between dashboard updates
+  chart_timeframe: "24h"       # Default chart timeframe
+  show_advanced_metrics: true  # Show detailed metrics
+  
+# Emergency procedures
+emergency:
+  auto_shutdown_enabled: true  # Auto-shutdown on critical alerts
+  shutdown_conditions:
+    - "max_daily_loss_exceeded"
+    - "critical_system_error"
+    - "max_drawdown_exceeded"
+  
+  # Recovery procedures
+  auto_restart_enabled: false  # Auto-restart after shutdown
+  restart_delay_minutes: 60    # Delay before restart attempt
+  max_restart_attempts: 3      # Max automatic restart attempts
+
+# Performance benchmarks
+benchmarks:
+  target_daily_return: 2.0     # Target daily return %
+  target_monthly_return: 15.0  # Target monthly return %
+  target_sharpe_ratio: 1.5     # Target Sharpe ratio
+  target_win_rate: 55.0        # Target win rate %
+  target_profit_factor: 1.8    # Target profit factor
+
+# Notification channels
+notifications:
+  console: true                # Console notifications
+  file_log: true              # File logging
+  email: false                # Email notifications
+  webhook: false              # Webhook notifications
+  
+  webhook_url: ""             # Discord/Slack webhook URL
+  
+# Advanced monitoring
+advanced:
+  track_slippage: true        # Track execution slippage
+  track_latency: true         # Track system latency
+  track_correlation: true     # Track strategy correlation
+  track_regime_changes: true  # Track market regime changes
+  
+  # Statistical monitoring
+  calculate_var: true         # Calculate Value at Risk
+  var_confidence: 0.95        # VaR confidence level
+  calculate_beta: true        # Calculate portfolio beta
+  
+# Report generation
+reports:
+  daily_summary: true         # Generate daily summary
+  weekly_report: true         # Generate weekly report
+  monthly_analysis: true      # Generate monthly analysis
+  
+  export_formats: ["csv", "json", "html"]
+  report_directory: "reports/"
+  
+# Integration settings
+integrations:
+  trading_engine: true        # Integrate with trading engine
+  risk_manager: true          # Integrate with risk manager
+  adaptive_learning: true     # Integrate with ML system
+  
+  # External services
+  market_data_feed: false     # External market data
+  news_sentiment: false       # News sentiment analysis
+  economic_calendar: false    # Economic events

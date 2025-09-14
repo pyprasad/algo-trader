@@ -1,0 +1,9 @@
+# DAX-specific configuration
+strategy:
+  mode: "HISTORICAL"
+  rsi_period: 14
+  rsi_buy_threshold: 80  # More conservative for DAX
+  rsi_sell_threshold: 20  # More conservative for DAX
+  stop_loss_pips: 20     # Wider stops for DAX volatility
+  take_profit_pips: 40   # Better risk/reward for DAX
+  dynamic_atr_sltp: true

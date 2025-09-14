@@ -1,0 +1,31 @@
+# Optimized configuration for better profitability
+
+ig:
+  api_key: "3772057d9d126d6d19d7cb6ec146404de00e5421"
+  username: "yuganp"
+  password: "Testing@123"
+  base_url: "https://demo-api.ig.com/gateway/deal"
+  session_duration: 3600
+  cache_file: "session_cache.json"
+  log_file: "ig_streaming.log"
+
+mongodb:
+  uri: "mongodb://127.0.0.1:27017"
+  database: "ftse100_scalping_bot"
+  collection: "ftse100"
+
+strategy:
+  mode: "HISTORICAL"
+  rsi_period: 14
+  rsi_buy_threshold: 75  # More selective - was 70
+  rsi_sell_threshold: 25  # More selective - was 30
+  stop_loss_pips: 8      # Tighter stop loss
+  take_profit_pips: 25   # Better risk/reward ratio
+  dynamic_atr_sltp: true
+
+# Additional filters for better performance
+trading_filters:
+  min_trend_strength: 0.6  # Only trade with strong trends
+  volume_filter: true      # Avoid low volume periods
+  session_filter: true     # Trade only during active sessions
+  max_trades_per_day: 5    # Limit overtrading
